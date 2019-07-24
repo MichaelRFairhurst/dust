@@ -1,0 +1,11 @@
+name: fuzz_example_analyzer
+version: 0.0.1
+description: Fuzz testing for dart
+authors:
+  - Mike Fairhurst <mfairhurst@google.com>
+homepage: https://github.com/MichaelRFairhurst/fuzz_test.dart
+environment:
+  sdk: '>=2.1.0 <3.0.0'
+dependencies:
+  analyzer: any
+  
