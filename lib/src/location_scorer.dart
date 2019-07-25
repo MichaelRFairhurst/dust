@@ -34,7 +34,7 @@ class LocationScorer {
   LocationScorer(this._sensitivity);
 
   // TODO: add a bloom filter to make this faster?
-  bool isNew(Location location) => !_locationOccurences.keys.contains(location);
+  bool isNew(Location location) => !_locationOccurences.containsKey(location);
 
   /// Report a [Location] for scoring later.
   void report(Location location) => _locationOccurences

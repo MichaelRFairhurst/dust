@@ -27,6 +27,9 @@ pub global activate --source git git@github.com:MichaelRFairhurst/dust.git
 pub global run dust path/to/script.dart
 ```
 
+**Note: it is *highly* recommended to snapshot your script before running for
+better performance.**
+
 There are some special options you can see with `pub global run dust --help` to
 configure how exactly the fuzzer runs.
 
