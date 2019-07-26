@@ -179,10 +179,8 @@ class Controller {
                 range.coverage?.hits?.map(
                   (id) => _locationCanonicalizer.canonicalize(
                     Location(
-                      sourceReport.scripts
-                          .map((script) => _locationCanonicalizer
-                              .processScriptUri(script.id))
-                          .join(),
+                      _locationCanonicalizer
+                          .processScriptUri(sourceReport.scripts[0]?.id ?? ""),
                       id,
                     ),
                   ),
