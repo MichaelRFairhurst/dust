@@ -7,9 +7,10 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:dust/src/location.dart';
+import 'package:dust/src/location_canonicalizer.dart';
 import 'package:dust/src/result.dart';
-import 'package:pedantic/pedantic.dart';
 import 'package:path/path.dart' as path;
+import 'package:pedantic/pedantic.dart';
 import 'package:vm_service_lib/vm_service_lib.dart';
 import 'package:vm_service_lib/vm_service_lib_io.dart';
 
@@ -27,6 +28,7 @@ class Controller {
   final String _script;
   final String _host = 'localhost';
   final int _port;
+  final LocationCanonicalizer _locationCanonicalizer;
   int _exitCode;
   VmService _serviceClient;
   Process _process;
@@ -36,7 +38,7 @@ class Controller {
   Duration _timeElapsed;
 
   /// Construct a [Controller] from a script and a port.
-  Controller(this._script, this._port);
+  Controller(this._script, this._port, this._locationCanonicalizer);
 
   /// Check if this VM is connected.
   bool get isConnected => _serviceClient != null;
@@ -85,9 +87,6 @@ class Controller {
       return Result.failed(jsonOut['output'], _timeElapsed, locations);
     }
   }
-
-  String _cleanUpScript(String name) =>
-      name.split('/')[3].replaceAll('%2F', '/').replaceAll('file%3A//', '');
 
   Future<VmService> _connect() async {
     final _serviceClient = await _exponentialBackoff(
@@ -178,11 +177,14 @@ class Controller {
           (sourceReport) => sourceReport.ranges.expand(
             (range) =>
                 range.coverage?.hits?.map(
-                  (id) => Location(
-                    sourceReport.scripts
-                        .map((script) => _cleanUpScript(script.id))
-                        .join(),
-                    id,
+                  (id) => _locationCanonicalizer.canonicalize(
+                    Location(
+                      sourceReport.scripts
+                          .map((script) => _locationCanonicalizer
+                              .processScriptUri(script.id))
+                          .join(),
+                      id,
+                    ),
                   ),
                 ) ??
                 <Location>[],

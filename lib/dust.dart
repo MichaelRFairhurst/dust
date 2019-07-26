@@ -8,6 +8,7 @@ export 'package:dust/src/driver.dart';
 export 'package:dust/src/failure.dart';
 export 'package:dust/src/failure_library.dart';
 export 'package:dust/src/location.dart';
+export 'package:dust/src/location_canonicalizer.dart';
 export 'package:dust/src/location_scorer.dart';
 export 'package:dust/src/result.dart';
 export 'package:dust/src/seed.dart';

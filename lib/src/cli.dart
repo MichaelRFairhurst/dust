@@ -8,6 +8,7 @@ import 'dart:math';
 import 'package:args/args.dart';
 import 'package:dust/src/controller.dart';
 import 'package:dust/src/failure_library.dart';
+import 'package:dust/src/location_canonicalizer.dart';
 import 'package:dust/src/location_scorer.dart';
 import 'package:dust/src/seed_library.dart';
 
@@ -30,6 +31,9 @@ class Cli {
         help: 'The sensitivity of preferring fewer more unique locations vs'
             ' more less unique locations',
         defaultsTo: '2.0')
+    ..addFlag('compress_locations',
+        abbr: 'c',
+        help: 'Compress location IDs (uses less memory but is not reversible)')
     ..addMultiOption('seed',
         abbr: 's', help: 'An initial seed (allows multiple)', defaultsTo: ['']);
 
@@ -70,10 +74,13 @@ class Cli {
     List<Controller> runners;
     try {
       final locationScorer = LocationScorer(locationSensitivity);
+      final locationCanonicalizer =
+          LocationCanonicalizer(compress: args['compress_locations']);
       final seedLibrary = SeedLibrary(locationScorer);
       final failureLibrary = FailureLibrary();
-      runners =
-          Iterable.generate(vms, (i) => Controller(script, port + i)).toList();
+      runners = Iterable.generate(
+              vms, (i) => Controller(script, port + i, locationCanonicalizer))
+          .toList();
       await Future.wait(runners.map((runner) => runner.prestart()));
       final driver =
           Driver(seedLibrary, failureLibrary, batchSize, runners, Random());
