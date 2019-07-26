@@ -19,7 +19,7 @@ void main(List<String> args) async {
 
   final ByteStore byteStore = new MemoryByteStore();
 
-  final StringBuffer logBuffer = new StringBuffer();
+  final logBuffer = new StringBuffer();
   PerformanceLog logger;
 
   DartSdk sdk;
@@ -27,44 +27,44 @@ void main(List<String> args) async {
   AnalysisDriverScheduler scheduler;
   AnalysisDriver driver;
 
-  AnalysisOptionsImpl analysisOptions = AnalysisOptionsImpl();
+  final analysisOptions = AnalysisOptionsImpl();
 
   final resourceProvider = MemoryResourceProvider();
 
   String convertPath(String path) => resourceProvider.convertPath(path);
 
   Folder getFolder(String path) {
-    String convertedPath = convertPath(path);
+    final convertedPath = convertPath(path);
     return resourceProvider.getFolder(convertedPath);
   }
 
-  sdk = new MockSdk(resourceProvider: resourceProvider);
-  logger = new PerformanceLog(logBuffer);
-  scheduler = new AnalysisDriverScheduler(logger);
+  sdk = MockSdk(resourceProvider: resourceProvider);
+  logger = PerformanceLog(logBuffer);
+  scheduler = AnalysisDriverScheduler(logger);
 
   packageMap = <String, List<Folder>>{
     'test': [getFolder('/test/lib')],
     'meta': [getFolder('/.pub-cache/meta/lib')],
   };
 
-  driver = new AnalysisDriver(
+  driver = AnalysisDriver(
       scheduler,
       logger,
       resourceProvider,
       byteStore,
-      new FileContentOverlay(),
+      FileContentOverlay(),
       null,
-      new SourceFactory([
-        new DartUriResolver(sdk),
-        new PackageMapUriResolver(resourceProvider, packageMap),
-        new ResourceUriResolver(resourceProvider)
+      SourceFactory([
+        DartUriResolver(sdk),
+        PackageMapUriResolver(resourceProvider, packageMap),
+        ResourceUriResolver(resourceProvider)
       ], null, resourceProvider),
       analysisOptions);
 
   scheduler.start();
 
   File newFile(String path, {String content = ''}) {
-    String convertedPath = convertPath(path);
+    final convertedPath = convertPath(path);
     return resourceProvider.newFile(convertedPath, content);
   }
 
@@ -72,12 +72,10 @@ void main(List<String> args) async {
     newFile('/test/lib/test.dart', content: content);
   }
 
-  Future<ResolvedUnitResult> resolveFile(String path) async {
-    return await driver.getResult(path);
-  }
+  Future<ResolvedUnitResult> resolveFile(String path) => driver.getResult(path);
 
   Future<void> resolveTestFile() async {
-    var path = convertPath('/test/lib/test.dart');
+    final path = convertPath('/test/lib/test.dart');
     await resolveFile(path);
   }
 

@@ -3,7 +3,6 @@
 // BSD-style license that can be found in the LICENSE file.
 
 import 'package:dust/src/failure.dart';
-import 'package:dust/src/result.dart';
 
 /// A way to collect and dedupe failures
 class FailureLibrary {
@@ -12,7 +11,7 @@ class FailureLibrary {
 
   /// Report a [Failure], and returns its original if it exists.
   Failure report(Failure failure) {
-    String error = failure.result.errorOutput;
+    var error = failure.result.errorOutput;
     error = error.substring(0, error.length > 500 ? 500 : error.length);
     if (_previousFailures.keys.contains(error)) {
       return _previousFailures[error];

@@ -21,6 +21,7 @@ class SeedLibrary {
   final SeedScorer _scorer;
   final LocationScorer _locationScorer;
 
+  /// Create a [SeedLibrary] with a custom [LocationScorer].
   factory SeedLibrary(LocationScorer locationScorer) {
     final seeds = <Seed>[];
     final weightedSeeds = WeightedOptions<Seed>(seeds, (seed) => seed.score);
@@ -32,6 +33,7 @@ class SeedLibrary {
   SeedLibrary._(
       this._scorer, this._locationScorer, this._seeds, this._weightedSeeds);
 
+  /// Get the next batch of [n] [Seed]s, randomly chosen by their scores.
   List<Seed> getBatch(int n, Random random) {
     _potentiallyRescore();
 

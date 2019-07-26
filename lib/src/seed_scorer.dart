@@ -6,11 +6,10 @@ import 'dart:math';
 
 import 'package:dust/src/location.dart';
 import 'package:dust/src/location_scorer.dart';
-import 'package:dust/src/result.dart';
 import 'package:dust/src/seed.dart';
 
-/// Determines the value of running a [Seed] based on its original [FuzzResult]
-/// run and an input [LocationScorer].
+/// Determines the value of running a [Seed] based on its original result run
+/// and an input [LocationScorer].
 ///
 /// We are trying to estimate the likelihood that mutating a seed will get us
 /// new fuzz failures. This is a combination of factors: the uniqueness of its
@@ -47,14 +46,17 @@ import 'package:dust/src/seed.dart';
 class SeedScorer {
   final LocationScorer _locationScorer;
 
+  /// Initialize a [SeedScorer] with a custom [LocationScorer].
   SeedScorer(this._locationScorer);
 
+  /// Calculate the score of a [Seed].
   double getScore(Seed seed) =>
       _locationScore(seed) /
       _microseconds(seed) *
       _failurePenalty(seed) *
       _lengthPenalty(seed);
 
+  /// Set the score of a [Seed] to a newly calculated value.
   void score(Seed seed) => seed.score = getScore(seed);
 
   double _failurePenalty(Seed seed) =>

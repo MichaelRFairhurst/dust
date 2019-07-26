@@ -4,6 +4,6 @@
 
 import 'package:dust/src/cli.dart';
 
-void main(List<String> args) async {
+Future<void> main(List<String> args) async {
   await Cli().run(args);
 }

@@ -4,11 +4,17 @@
 
 import 'package:dust/src/result.dart';
 
+/// Represents a failed VM [Result] and the [input] which triggered it.
 class Failure {
+  /// The input string that caused the failure.
   final String input;
+
+  /// The VM run result.
   final Result result;
 
-  Failure(this.input, this.result) {
-    assert(!result.succeeded);
-  }
+  /// Construct a [Failure] with an [input] string and the VM [Result], which
+  /// must be a failed execution run for consistency.
+  Failure(this.input, this.result)
+      : assert(!result.succeeded,
+            'Failure instances should be given Results that failed.');
 }

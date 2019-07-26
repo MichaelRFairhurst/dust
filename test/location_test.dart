@@ -2,7 +2,7 @@
 // for details. All rights reserved. Use of this source code is governed by a
 // BSD-style license that can be found in the LICENSE file.
 
-import 'package:fuzz/location.dart';
+import 'package:dust/src/location.dart';
 import 'package:test/test.dart';
 
 void main() {
@@ -12,12 +12,12 @@ void main() {
     expect(location.toString(), '/lib/foo.dart:3');
   });
 
-  test("a location is equal when source and id are equal", () {
+  test('a location is equal when source and id are equal', () {
     final equalLocation = Location('/lib/foo.dart', 3);
     expect(location, equalLocation);
   });
 
-  test("a location is not equal when source and id are not equal", () {
+  test('a location is not equal when source and id are not equal', () {
     final wrongSource = Location('/lib/bar.dart', 3);
     final wrongId = Location('/lib/foo.dart', 4);
     final wrongSourceId = Location('/lib/bar.dart', 4);
@@ -31,7 +31,7 @@ void main() {
     expect(location.hashCode, equalLocation.hashCode);
   });
 
-  test("known cases of different hashCodes", () {
+  test('known cases of different hashCodes', () {
     final wrongSource = Location('/lib/bar.dart', 3);
     final wrongId = Location('/lib/foo.dart', 4);
     final wrongSourceId = Location('/lib/bar.dart', 4);

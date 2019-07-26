@@ -4,14 +4,16 @@
 
 import 'dart:math';
 
+/// Add a single random char to a random position in the [input] string.
 String addChar(String input, Random random) {
   final newchar = _randomChar(random);
   final charpos = _randomPos(input, random, true);
   return input.replaceRange(charpos, charpos, newchar);
 }
 
+/// Change a single random char to a new random char in the [input] string.
 String flipChar(String input, Random random) {
-  if (input.length == 0) {
+  if (input.isEmpty) {
     return addChar(input, random);
   }
 
@@ -20,6 +22,7 @@ String flipChar(String input, Random random) {
   return input.replaceRange(charpos, charpos + 1, newchar);
 }
 
+/// Perform a random mutation on the [input] String.
 String mutate(String input, Random random) {
   switch (random.nextInt(3)) {
     case 0:
@@ -30,11 +33,12 @@ String mutate(String input, Random random) {
       return removeChar(input, random);
   }
 
-  throw 'should not be possible';
+  throw Exception('should not be possible');
 }
 
+/// Remove a single random char in the [input] string.
 String removeChar(String input, Random random) {
-  if (input.length == 0) {
+  if (input.isEmpty) {
     return addChar(input, random);
   }
   final charpos = _randomPos(input, random);
@@ -42,7 +46,7 @@ String removeChar(String input, Random random) {
 }
 
 String _randomChar(Random random) =>
-    new String.fromCharCode(random.nextInt(128 - 31) + 31);
+    String.fromCharCode(random.nextInt(128 - 31) + 31);
 
 int _randomPos(String s, Random random, [bool inclusive = false]) =>
-    s.length == 0 ? 0 : random.nextInt(s.length + (inclusive ? 1 : 0));
+    s.isEmpty ? 0 : random.nextInt(s.length + (inclusive ? 1 : 0));

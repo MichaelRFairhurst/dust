@@ -4,18 +4,31 @@
 
 import 'package:quiver/core.dart' as q;
 
+/// Represents a code path that was or wasn't executed by the VM.
+///
+/// The VM provides both a special canonicalized URI string, and also a unique
+/// integer identifier based on the code offset of the code path. This class
+/// should be constructed with the integer ID unchanged, but the script URI
+/// made shorter & more human readable.
 class Location {
+  /// The script URI of the executed code path.
   final String scriptUri;
+
+  /// The VM location ID (within a script) for this code path.
   final int locationId;
 
+  /// Construct a [Location] with the given script & VM location ID.
   Location(this.scriptUri, this.locationId);
 
+  @override
   int get hashCode => q.hash2(scriptUri.hashCode, locationId.hashCode);
 
+  @override
   bool operator ==(Object other) =>
       other is Location &&
       other.scriptUri == scriptUri &&
       other.locationId == locationId;
 
+  @override
   String toString() => '$scriptUri:$locationId';
 }

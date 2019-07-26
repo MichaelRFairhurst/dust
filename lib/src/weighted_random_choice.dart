@@ -9,13 +9,13 @@ import 'dart:math';
 int _binarySearch<T>(
     List<_AlignedOption<T>> options, double value, int min, int max) {
   while (min < max) {
-    int mid = min + ((max - min) >> 1);
-    var element = options[mid];
-    int comp = element.alignment.compareTo(value);
+    final mid = min + ((max - min) >> 1);
+    final element = options[mid];
+    final comp = element.alignment.compareTo(value);
     if (comp < 0) {
-      min = mid + 1;
+      min = mid + 1; // ignore: parameter_assignments
     } else {
-      max = mid;
+      max = mid; // ignore: parameter_assignments
     }
   }
   return max;
@@ -63,13 +63,19 @@ class WeightedOptions<T> {
   List<_AlignedOption<T>> _alignedOptions;
   int _pivot;
 
+  /// Create weighted options via the options themselves and a callback to get
+  /// each options' weight.
   WeightedOptions(this._options, this._getWeight);
 
+  /// Choose an option randomly with probability proportional to its weight.
   T choose(Random random) {
     _presort();
     return _choose(random);
   }
 
+  /// Choose [n] options randomly.
+  ///
+  /// This is more efficient than calling [choose] [n] times.
   List<T> chooseMany(int n, Random random) {
     _presort();
 
@@ -77,8 +83,7 @@ class WeightedOptions<T> {
   }
 
   T _choose(Random random) {
-    double sum = _alignedOptions.last.alignment;
-
+    final sum = _alignedOptions.last.alignment;
     final choiceAlignment = random.nextDouble() * sum;
     final pivotItem = _alignedOptions[_pivot];
 
@@ -108,13 +113,13 @@ class WeightedOptions<T> {
   void _presort() {
     // sort backwards, least likely first.
     _options.sort((a, b) => _getWeight(a).compareTo(_getWeight(b)));
-    double weightSum = _options.fold(0, (acc, item) => acc + _getWeight(item));
+    final weightSum = _options.fold(0.0, (acc, item) => acc + _getWeight(item));
 
     _alignedOptions = List<_AlignedOption<T>>(_options.length);
     _pivot = null;
 
-    int i = 0;
-    double currentSum = 0;
+    var i = 0;
+    var currentSum = 0.0;
     for (final option in _options) {
       currentSum += _getWeight(option);
       _alignedOptions[i] = _AlignedOption(option, currentSum);
@@ -132,6 +137,5 @@ class WeightedOptions<T> {
 class _AlignedOption<T> {
   final T option;
   final double alignment;
-
   _AlignedOption(this.option, this.alignment);
 }

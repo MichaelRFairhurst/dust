@@ -3,21 +3,19 @@
 // BSD-style license that can be found in the LICENSE file.
 
 import 'dart:async';
-import 'dart:collection';
 import 'dart:convert';
 import 'dart:io';
 
 import 'package:dust/src/location.dart';
 import 'package:dust/src/result.dart';
-import 'package:path/path.dart' as p;
-import 'package:path/path.dart' as path;
 import 'package:pedantic/pedantic.dart';
+import 'package:path/path.dart' as path;
 import 'package:vm_service_lib/vm_service_lib.dart';
 import 'package:vm_service_lib/vm_service_lib_io.dart';
 
 /// A class to start a VM, connect to its service, and control its fuzz cases.
 ///
-/// A controller should be [prestart]ed, and [disposed] when no longer needed.
+/// A controller should be [prestart]ed, and [dispose]d when no longer needed.
 ///
 /// Controllers will start `bin/controller.dart` in a new VM with an observatory
 /// port open. The controller script and controller class communicate with JSON
@@ -37,8 +35,13 @@ class Controller {
   Future<void> _processExit;
   Duration _timeElapsed;
 
+  /// Construct a [Controller] from a script and a port.
   Controller(this._script, this._port);
 
+  /// Check if this VM is connected.
+  bool get isConnected => _serviceClient != null;
+
+  /// Kill the process & close the service connection.
   Future<void> dispose() async {
     try {
       _serviceClient?.dispose();
@@ -53,16 +56,18 @@ class Controller {
     }
   }
 
+  /// Start the VM for this controller so that its ready to run cases.
   Future<void> prestart() async {
     _exitCode = null;
     await _startProcess();
     _serviceClient = await _connect();
   }
 
+  /// Run an individual case on a VM controller that's already been prestarted.
   Future<Result> run(String input) async {
     _startTime = DateTime.now();
     _outputBuffer = StringBuffer();
-    await _process.stdin.writeln(jsonEncode(input));
+    _process.stdin.writeln(jsonEncode(input));
     final fuzz = await _fuzzIsolateComplete();
 
     final locations = await _getLocations(fuzz);
@@ -70,7 +75,7 @@ class Controller {
     await _serviceClient.resume(fuzz.id);
     await _fuzzIsolateDead();
 
-    Map<String, dynamic> jsonOut = await _exponentialBackoff(
+    final jsonOut = await _exponentialBackoff(
         () async => jsonDecode(_outputBuffer.toString().trim()), (_) => true);
 
     final bool succeeded = jsonOut['success'];
@@ -86,7 +91,7 @@ class Controller {
 
   Future<VmService> _connect() async {
     final _serviceClient = await _exponentialBackoff(
-        () => vmServiceConnect(_host, _port, log: StdoutLog()),
+        () => vmServiceConnect(_host, _port, log: _StdoutLog()),
         (client) => client != null);
     unawaited(_serviceClient.streamListen(EventStreams.kIsolate));
     unawaited(_serviceClient.streamListen(EventStreams.kDebug));
@@ -100,14 +105,12 @@ class Controller {
     return _serviceClient;
   }
 
-  bool get isConnected => _serviceClient != null;
-
   Future<T> _exponentialBackoff<T>(
       Future<T> Function() action, bool Function(T) accept,
       {int limit = 50}) async {
     var wait = Duration(milliseconds: 1);
 
-    var reason;
+    dynamic reason;
 
     var i = 0;
     while (i++ < limit) {
@@ -117,7 +120,7 @@ class Controller {
       }
 
       try {
-        var result = await action();
+        final result = await action();
         if (accept(result)) {
           return result;
         }
@@ -189,25 +192,24 @@ class Controller {
   }
 
   Future<void> _startProcess() async {
-    String sdk = path.dirname(path.dirname(Platform.resolvedExecutable));
+    final sdk = path.dirname(path.dirname(Platform.resolvedExecutable));
 
-    _process = await Process.start('${sdk}/bin/dart', [
+    _process = await Process.start('$sdk/bin/dart', [
       '--pause_isolates_on_exit',
-      '--enable-vm-service=${_port}',
+      '--enable-vm-service=$_port',
       '--disable-service-auth-codes',
       path.join(Platform.environment['HOME'],
           '.pub-cache/global_packages/dust/bin/controller.dart.snapshot.dart2'),
       _script,
     ]);
 
-    Completer vmCompleter = Completer();
-    // ignore: unawaited_futures
-    _process.exitCode.then((code) {
+    final vmCompleter = Completer();
+    unawaited(_process.exitCode.then((code) {
       _exitCode = code;
       vmCompleter.complete();
       _serviceClient?.dispose();
       _serviceClient = null;
-    });
+    }));
     _processExit = vmCompleter.future;
 
     // ignore: strong_mode_down_cast_composite
@@ -217,8 +219,10 @@ class Controller {
   }
 }
 
-class StdoutLog extends Log {
+class _StdoutLog extends Log {
+  @override
   void severe(String message) => print(message);
 
+  @override
   void warning(String message) => print(message);
 }

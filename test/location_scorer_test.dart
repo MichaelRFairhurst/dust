@@ -2,10 +2,8 @@
 // for details. All rights reserved. Use of this source code is governed by a
 // BSD-style license that can be found in the LICENSE file.
 
-import 'dart:math';
-
-import 'package:fuzz/location.dart';
-import 'package:fuzz/location_scorer.dart';
+import 'package:dust/src/location.dart';
+import 'package:dust/src/location_scorer.dart';
 import 'package:test/test.dart';
 
 void main() {
@@ -25,8 +23,7 @@ void main() {
     });
 
     test("other locations don't affect the score", () {
-      scorer.report(locationB);
-      scorer.report(locationB);
+      scorer..report(locationB)..report(locationB);
       expect(scorer.score(locationA), 1.0);
     });
 
@@ -46,28 +43,24 @@ void main() {
   group('scorers with different sensitivities', () {
     test('a unique location always gets a score of 1', () {
       for (var i = 1.0; i < 500; i *= 2) {
-        final scorer = LocationScorer(i);
-        scorer.report(locationA);
+        final scorer = LocationScorer(i)..report(locationA);
         expect(scorer.score(locationA), 1.0);
       }
     });
 
     test('a scorer with sensitivity of 2 goes from 1 to 0.25', () {
-      final scorer = LocationScorer(2);
-      scorer.report(locationA);
-      scorer.report(locationA);
+      final scorer = LocationScorer(2)..report(locationA)..report(locationA);
       expect(scorer.score(locationA), 0.25);
     });
   });
 
   test('score all', () {
-    final scorer = LocationScorer(1);
-
-    scorer.report(locationA);
-    scorer.report(locationA);
-    scorer.report(locationB);
-    scorer.report(locationB);
-    scorer.report(locationB);
+    final scorer = LocationScorer(1)
+      ..report(locationA)
+      ..report(locationA)
+      ..report(locationB)
+      ..report(locationB)
+      ..report(locationB);
 
     expect(scorer.scoreAll([locationA]), 0.5);
     expect(scorer.scoreAll([locationB]), 1 / 3);

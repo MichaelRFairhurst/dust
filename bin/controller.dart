@@ -9,11 +9,11 @@ import 'dart:isolate';
 
 Future main(List<String> args) async {
   final isolateScript = args[0];
-  String pretext = '';
+  var pretext = '';
 
   stdin.listen((input) async {
-    bool succeeded = true;
-    StringBuffer output = StringBuffer();
+    var succeeded = true;
+    final output = StringBuffer();
     try {
       String value;
       try {
@@ -26,7 +26,7 @@ Future main(List<String> args) async {
 
       final onError = RawReceivePort();
       final onComplete = RawReceivePort();
-      Completer isolateDone = Completer();
+      var isolateDone = Completer();
 
       onError.handler = (error) {
         output.write(error);

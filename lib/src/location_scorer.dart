@@ -31,9 +31,11 @@ class LocationScorer {
 
   final double _sensitivity;
 
+  /// Create a new [LocationScorer] with the given sensitivity.
   LocationScorer(this._sensitivity);
 
   // TODO: add a bloom filter to make this faster?
+  /// Check if a [Location] has been seen previously by this scorer.
   bool isNew(Location location) => !_locationOccurences.containsKey(location);
 
   /// Report a [Location] for scoring later.

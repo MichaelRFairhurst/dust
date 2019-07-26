@@ -3,7 +3,6 @@
 // BSD-style license that can be found in the LICENSE file.
 
 import 'dart:io';
-import 'dart:isolate';
 import 'dart:math';
 
 import 'package:args/args.dart';
@@ -14,8 +13,9 @@ import 'package:dust/src/seed_library.dart';
 
 import 'driver.dart';
 
+/// Primary class for running the fuzzer on the CLI.
 class Cli {
-  final parser = new ArgParser()
+  final _parser = ArgParser()
     ..addFlag('help', abbr: 'h', help: 'print this help')
     ..addOption('vm_count',
         abbr: 'v', help: 'How many VMs to run at once', defaultsTo: '8')
@@ -30,27 +30,25 @@ class Cli {
         help: 'The sensitivity of preferring fewer more unique locations vs'
             ' more less unique locations',
         defaultsTo: '2.0')
-    ..addOption('seed',
-        allowMultiple: true,
-        abbr: 's',
-        help: 'An initial seed (allows multiple)',
-        defaultsTo: '');
+    ..addMultiOption('seed',
+        abbr: 's', help: 'An initial seed (allows multiple)', defaultsTo: ['']);
 
+  /// Run the CLI given the provided arguments.
   Future<void> run(List<String> baseArgs) async {
     ArgResults args;
     try {
-      args = parser.parse(baseArgs);
+      args = _parser.parse(baseArgs);
     } catch (e) {
       print(e);
-      usageAndExit();
+      _usageAndExit();
     }
     if (args.rest.length != 1) {
       print('expected a script to fuzz');
-      usageAndExit();
+      _usageAndExit();
     }
 
     if (args['help']) {
-      usageAndExit();
+      _usageAndExit();
     }
 
     final script = args.rest[0];
@@ -66,7 +64,7 @@ class Cli {
       locationSensitivity = double.parse(args['location_sensitivity']);
     } catch (e) {
       print('invalid specified argument: $e');
-      usageAndExit();
+      _usageAndExit();
     }
 
     List<Controller> runners;
@@ -91,9 +89,9 @@ class Cli {
     }
   }
 
-  void usageAndExit() {
+  void _usageAndExit() {
     print('usage: fuzz.dart [options] script.dart');
-    print(parser.usage);
+    print(_parser.usage);
     exit(1);
   }
 }

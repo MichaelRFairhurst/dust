@@ -4,24 +4,36 @@
 
 import 'dart:collection';
 
+/// A pool of workers that can asynchronously consume a queue.
 class Pool<W, D> {
-  final List<W> workers;
-  final Future<void> Function(W, D) use;
-  final Future<bool> Function(W, D, dynamic) handleError;
+  final List<W> _workers;
 
-  Pool(this.workers, this.use, {this.handleError});
+  /// The function of how to consume a queue item given a single worker.
+  final Future<void> Function(W, D) _use;
 
+  /// Error handler which accepts the worker that failed, the item it failed on,
+  /// and the error that was raised.
+  final Future<bool> Function(W, D, Object) _handleError;
+
+  /// Create a [Pool] of workers, along with how they run and an optional error
+  /// handler.
+  Pool(this._workers, this._use,
+      {Future<bool> Function(W, D, Object) handleError})
+      : _handleError = handleError;
+
+  /// Give the pool a [Queue] to work through before the resulting future
+  /// completes.
   Future<void> consume(Queue<D> queue) async {
-    await Future.wait(workers.map((worker) => _singleWorker(worker, queue)));
+    await Future.wait(_workers.map((worker) => _singleWorker(worker, queue)));
   }
 
   Future<void> _singleWorker(W worker, Queue<D> queue) async {
     while (queue.isNotEmpty) {
-      var item = queue.removeLast();
+      final item = queue.removeLast();
       try {
-        await use(worker, item);
+        await _use(worker, item);
       } catch (e) {
-        if (await handleError(worker, item, e)) {
+        if (await _handleError(worker, item, e)) {
           queue.add(item);
         }
       }
