@@ -92,15 +92,17 @@ class Controller {
     final _serviceClient = await _exponentialBackoff(
         () => vmServiceConnect(_host, _port, log: _StdoutLog()),
         (client) => client != null);
-    unawaited(_serviceClient.streamListen(EventStreams.kIsolate));
     unawaited(_serviceClient.streamListen(EventStreams.kDebug));
-    unawaited(_serviceClient.streamListen(EventStreams.kVM));
-    unawaited(_serviceClient.streamListen(EventStreams.kStdout));
     _serviceClient.onDebugEvent.listen((event) {
-      if (event.kind == 'PauseExit' && event.isolate.name != 'fuzz_target') {
-        _serviceClient.resume(event.isolate.id);
+      if (event.kind == 'PauseExit') {
+        if (event.isolate.name == 'fuzz_target') {
+          _timeElapsed = DateTime.now().difference(_startTime);
+        } else {
+          _serviceClient.resume(event.isolate.id);
+        }
       }
     });
+
     return _serviceClient;
   }
 
@@ -135,14 +137,6 @@ class Controller {
   }
 
   Future<Isolate> _fuzzIsolateComplete() async {
-    _serviceClient.onDebugEvent.listen((event) {
-      if (event.kind == 'PauseExit') {
-        if (event.isolate.name == 'fuzz_target') {
-          _timeElapsed = DateTime.now().difference(_startTime);
-        }
-      }
-    });
-
     final isolateRef = await _exponentialBackoff(
         () async => (await _serviceClient.getVM())
             .isolates
