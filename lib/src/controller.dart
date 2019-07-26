@@ -26,35 +26,35 @@ import 'package:vm_service_lib/vm_service_lib_io.dart';
 /// from that isolate before closing it, at which point the controller script
 /// reports back any failure information.
 class Controller {
-  final String _host = 'localhost';
   final String _script;
-
+  final String _host = 'localhost';
   final int _port;
-
+  int _exitCode;
   VmService _serviceClient;
-
   Process _process;
-
   DateTime _startTime;
-
   StringBuffer _outputBuffer;
-
   Future<void> _processExit;
-
   Duration _timeElapsed;
 
   Controller(this._script, this._port);
 
   Future<void> dispose() async {
     try {
-      await _serviceClient.dispose();
+      _serviceClient?.dispose();
+      _process?.kill();
+      _process = null;
+      _serviceClient = null;
       await _processExit;
     } finally {
       _process?.kill();
+      _process = null;
+      _serviceClient = null;
     }
   }
 
   Future<void> prestart() async {
+    _exitCode = null;
     await _startProcess();
     _serviceClient = await _connect();
   }
@@ -100,20 +100,36 @@ class Controller {
     return _serviceClient;
   }
 
-  Future<T> _exponentialBackoff<T>(
-      Future<T> Function() action, bool Function(T) accept) async {
-    Duration wait = Duration(milliseconds: 1);
+  bool get isConnected => _serviceClient != null;
 
-    while (true) {
+  Future<T> _exponentialBackoff<T>(
+      Future<T> Function() action, bool Function(T) accept,
+      {int limit = 50}) async {
+    var wait = Duration(milliseconds: 1);
+
+    var reason;
+
+    var i = 0;
+    while (i++ < limit) {
+      if (_exitCode != null) {
+        throw Exception(
+            'VM at $_port exited with code $_exitCode:\n$_outputBuffer');
+      }
+
       try {
         var result = await action();
         if (accept(result)) {
           return result;
         }
-      } catch (e) {}
+        reason = 'not accepted';
+      } catch (e, st) {
+        reason = '$e $st';
+      }
       await Future.delayed(wait);
       wait += Duration(milliseconds: 1);
     }
+
+    throw Exception('$limit tries exceeded: $reason');
   }
 
   Future<Isolate> _fuzzIsolateComplete() async {
@@ -181,15 +197,16 @@ class Controller {
       '--disable-service-auth-codes',
       path.join(Platform.environment['HOME'],
           '.pub-cache/global_packages/dust/bin/controller.dart.snapshot.dart2'),
-      //'bin/controller.dart',
       _script,
     ]);
 
     Completer vmCompleter = Completer();
     // ignore: unawaited_futures
     _process.exitCode.then((code) {
-      exitCode = code;
+      _exitCode = code;
       vmCompleter.complete();
+      _serviceClient?.dispose();
+      _serviceClient = null;
     });
     _processExit = vmCompleter.future;
 

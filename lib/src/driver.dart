@@ -37,10 +37,20 @@ class Driver {
 
   Future<void> run(List<String> seeds) async {
     // run initial seeds
-    await Pool<Controller, String>(_runners, _preseed)
-        .consume(Queue.from(seeds));
+    await Pool<Controller, String>(_runners, _preseed,
+        handleError: (controller, seed, error) =>
+            throw 'failed to preseed $seed: $error').consume(Queue.from(seeds));
 
-    final pool = Pool<Controller, Seed>(_runners, _runCase);
+    final pool = Pool<Controller, Seed>(_runners, _runCase,
+        handleError: (controller, seed, error) async {
+      print('error with ${seed.input}: $error');
+      if (controller.isConnected) controller.dispose();
+      await controller.prestart();
+      // Don't re-add item. It is randomly generated, and we've printed it. So
+      // it is safer to drop. Otherwise, if we weren't careful, a single bad
+      // item could deadlock the queue.
+      return false;
+    });
 
     while (true) {
       final batch = _seeds.getBatch(_batchSize, _random);

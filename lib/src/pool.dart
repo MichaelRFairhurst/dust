@@ -7,8 +7,9 @@ import 'dart:collection';
 class Pool<W, D> {
   final List<W> workers;
   final Future<void> Function(W, D) use;
+  final Future<bool> Function(W, D, dynamic) handleError;
 
-  Pool(this.workers, this.use);
+  Pool(this.workers, this.use, {this.handleError});
 
   Future<void> consume(Queue<D> queue) async {
     await Future.wait(workers.map((worker) => _singleWorker(worker, queue)));
@@ -16,7 +17,14 @@ class Pool<W, D> {
 
   Future<void> _singleWorker(W worker, Queue<D> queue) async {
     while (queue.isNotEmpty) {
-      await use(worker, queue.removeLast());
+      var item = queue.removeLast();
+      try {
+        await use(worker, item);
+      } catch (e) {
+        if (await handleError(worker, item, e)) {
+          queue.add(item);
+        }
+      }
     }
   }
 }
