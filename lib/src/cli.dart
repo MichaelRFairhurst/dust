@@ -46,7 +46,8 @@ class Cli {
           ..addFlag('constraint_subset_paths')
           ..addFlag('constraint_fewer_paths')
           ..addFlag('constraint_exact_paths')
-          ..addFlag('constraint_same_output', defaultsTo: true));
+          ..addFlag('constraint_same_output', defaultsTo: true)
+          ..addFlag('constraint_failed', defaultsTo: true));
 
   /// Run the CLI given the provided arguments.
   Future<void> run(List<String> baseArgs) async {
@@ -134,13 +135,14 @@ class Cli {
     try {
       await runner.prestart();
       final result = await runner.run(seed);
-      if (result.succeeded) {
+      if (result.succeeded && args['constraint_failed']) {
         print('Error: seed $seed did not fail, cannot be simplified.');
         return;
       }
+      // TODO(mfairhurst): this will fail an assert for --no-constraint-failed
       final failure = Failure(seed, await runner.run(seed));
       final simplifier = Simplifier(failure, runner, [
-        SimplifierConstraint.failed,
+        if (args['constraint_failed']) SimplifierConstraint.failed,
         if (args['constraint_subset_paths']) SimplifierConstraint.subsetPaths,
         if (args['constraint_fewer_paths']) SimplifierConstraint.fewerPaths,
         if (args['constraint_exact_paths']) SimplifierConstraint.exactPaths,
