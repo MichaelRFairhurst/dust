@@ -23,7 +23,7 @@ for all kinds of properties in your code by throwing exceptions when you wish.
 To fuzz your script, simply run:
 
 ```bash
-pub global activate --source git git@github.com:MichaelRFairhurst/dust.git
+pub global activate dust
 pub global run dust path/to/script.dart
 ```
 
