@@ -7,10 +7,12 @@ import 'dart:math';
 
 import 'package:args/args.dart';
 import 'package:dust/src/controller.dart';
+import 'package:dust/src/failure.dart';
 import 'package:dust/src/failure_library.dart';
 import 'package:dust/src/location_canonicalizer.dart';
 import 'package:dust/src/location_scorer.dart';
 import 'package:dust/src/seed_library.dart';
+import 'package:dust/src/simplifier.dart';
 
 import 'driver.dart';
 
@@ -35,7 +37,16 @@ class Cli {
         abbr: 'c',
         help: 'Compress location IDs (uses less memory but is not reversible)')
     ..addMultiOption('seed',
-        abbr: 's', help: 'An initial seed (allows multiple)', defaultsTo: ['']);
+        abbr: 's', help: 'An initial seed (allows multiple)', defaultsTo: [''])
+    ..addCommand(
+        'simplify',
+        ArgParser()
+          ..addOption('port',
+              abbr: 'p', help: 'The port for the VM', defaultsTo: '7575')
+          ..addFlag('constraint_subset_paths')
+          ..addFlag('constraint_fewer_paths')
+          ..addFlag('constraint_exact_paths')
+          ..addFlag('constraint_same_output', defaultsTo: true));
 
   /// Run the CLI given the provided arguments.
   Future<void> run(List<String> baseArgs) async {
@@ -46,6 +57,11 @@ class Cli {
       print(e);
       _usageAndExit();
     }
+    if (args.command?.name == 'simplify') {
+      await _simplify(args.command);
+      return;
+    }
+
     if (args.rest.length != 1) {
       print('expected a script to fuzz');
       _usageAndExit();
@@ -96,9 +112,59 @@ class Cli {
     }
   }
 
-  void _usageAndExit() {
-    print('usage: fuzz.dart [options] script.dart');
+  Future<void> _simplify(ArgResults args) async {
+    if (args.rest.length != 2) {
+      print('expected a script to fuzz and an input to simplify');
+      _usageAndExit();
+    }
+
+    final script = args.rest[0];
+    final seed = args.rest[1];
+
+    int port;
+    try {
+      port = int.parse(args['port']);
+    } catch (e) {
+      print('invalid specified argument: $e');
+      _usageAndExit();
+    }
+
+    final locationCanonicalizer = LocationCanonicalizer(compress: false);
+    final runner = Controller(script, port, locationCanonicalizer);
+    try {
+      await runner.prestart();
+      final result = await runner.run(seed);
+      if (result.succeeded) {
+        print('Error: seed $seed did not fail, cannot be simplified.');
+        return;
+      }
+      final failure = Failure(seed, await runner.run(seed));
+      final simplifier = Simplifier(failure, runner, [
+        SimplifierConstraint.failed,
+        if (args['constraint_subset_paths']) SimplifierConstraint.subsetPaths,
+        if (args['constraint_fewer_paths']) SimplifierConstraint.fewerPaths,
+        if (args['constraint_exact_paths']) SimplifierConstraint.exactPaths,
+        if (args['constraint_same_output']) SimplifierConstraint.sameOutput,
+      ]);
+
+      final simplification = await simplifier.simplify();
+
+      if (seed == simplification) {
+        print('Could not simplify.');
+      } else {
+        print('Simplified.\n$simplification');
+      }
+    } finally {
+      runner.dispose();
+    }
+  }
+
+  void _usageAndExit([String command]) {
+    print('usage: pub global run dust [options] script.dart');
     print(_parser.usage);
+    print('');
+    print('   or: pub global run dust simplify [options] script.dart input');
+    print(_parser.commands['simplify'].usage);
     exit(1);
   }
 }

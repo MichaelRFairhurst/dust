@@ -5,7 +5,7 @@ authors:
   - Mike Fairhurst <mfairhurst@google.com>
 homepage: https://github.com/MichaelRFairhurst/dust.dart
 environment:
-  sdk: '>=2.2.0 <3.0.0'
+  sdk: '>=2.2.2 <3.0.0'
 dependencies:
   crypto: '^2.0.6'
   args: '^1.5.2'
