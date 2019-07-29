@@ -7,6 +7,7 @@ homepage: https://github.com/MichaelRFairhurst/dust.dart
 environment:
   sdk: '>=2.2.2 <3.0.0'
 dependencies:
+  pedantic: '^1.8.0+1'
   crypto: '^2.0.6'
   args: '^1.5.2'
   vm_service_lib: '^3.21.0'
