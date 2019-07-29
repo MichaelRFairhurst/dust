@@ -108,7 +108,7 @@ class Controller {
 
   Future<T> _exponentialBackoff<T>(
       Future<T> Function() action, bool Function(T) accept,
-      {int limit = 50}) async {
+      {int limit = 90}) async {
     var wait = Duration(milliseconds: 1);
 
     dynamic reason;

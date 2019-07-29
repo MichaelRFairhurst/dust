@@ -37,7 +37,9 @@ class Cli {
         abbr: 'c',
         help: 'Compress location IDs (uses less memory but is not reversible)')
     ..addMultiOption('seed',
-        abbr: 's', help: 'An initial seed (allows multiple)', defaultsTo: [''])
+        abbr: 's',
+        help: 'An initial seed (allows multiple)',
+        splitCommas: false)
     ..addCommand(
         'simplify',
         ArgParser()
@@ -107,7 +109,11 @@ class Cli {
       driver.onDuplicateFail.listen((_) => stdout.write('F'));
       driver.onUniqueFail.listen((failure) =>
           print('\nFAILURE: ${failure.input}\n${failure.result.errorOutput}'));
-      await driver.run(args['seed']);
+      final seeds = args['seed'];
+      if (seeds.isEmpty) {
+        seeds.add('');
+      }
+      await driver.run(seeds);
     } finally {
       runners.forEach((runner) => runner.dispose());
     }
