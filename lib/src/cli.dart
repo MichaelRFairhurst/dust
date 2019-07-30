@@ -7,14 +7,17 @@ import 'dart:math';
 
 import 'package:args/args.dart';
 import 'package:dust/src/controller.dart';
+import 'package:dust/src/driver.dart';
 import 'package:dust/src/failure.dart';
 import 'package:dust/src/failure_library.dart';
+import 'package:dust/src/isolate_mutator.dart';
 import 'package:dust/src/location_canonicalizer.dart';
 import 'package:dust/src/location_scorer.dart';
+import 'package:dust/src/mutator.dart';
+import 'package:dust/src/mutators.dart';
 import 'package:dust/src/seed_library.dart';
 import 'package:dust/src/simplifier.dart';
-
-import 'driver.dart';
+import 'package:dust/src/weighted_random_choice.dart';
 
 /// Primary class for running the fuzzer on the CLI.
 class Cli {
@@ -40,6 +43,17 @@ class Cli {
         abbr: 's',
         help: 'An initial seed (allows multiple)',
         splitCommas: false)
+    ..addFlag('default_mutators',
+        abbr: 'u',
+        help: 'Whether to use the default mutators in addition to custom'
+            ' mutators',
+        defaultsTo: true)
+    ..addMultiOption(
+      'mutator_script',
+      abbr: 'm',
+      help: 'A path to a script, or comma separated path to scripts, that'
+          ' perform specialized mutations',
+    )
     ..addCommand(
         'simplify',
         ArgParser()
@@ -100,9 +114,11 @@ class Cli {
       runners = Iterable.generate(
               vms, (i) => Controller(script, port + i, locationCanonicalizer))
           .toList();
+
       await Future.wait(runners.map((runner) => runner.prestart()));
-      final driver =
-          Driver(seedLibrary, failureLibrary, batchSize, runners, Random());
+      final mutators = await _getMutators(args);
+      final driver = Driver(
+          seedLibrary, failureLibrary, batchSize, runners, mutators, Random());
 
       driver.onNewSeed.listen((seed) => print('\nNew seed: ${seed.input}'));
       driver.onSuccess.listen((_) => stdout.write('.'));
@@ -117,6 +133,36 @@ class Cli {
     } finally {
       runners.forEach((runner) => runner.dispose());
     }
+  }
+
+  Future<WeightedOptions<WeightedMutator>> _getMutators(ArgResults args) async {
+    final isolateMutators =
+        (args['mutator_script'] as List<String>).map((origScript) {
+      String script;
+      double weight;
+      if (origScript.contains(':')) {
+        final parts = script.split(':');
+
+        script = parts[0];
+        weight = double.parse(parts[1]);
+      } else {
+        weight = 1.0;
+        script = origScript;
+      }
+
+      return IsolateMutator(script, weight);
+    }).toList();
+
+    await Future.wait(isolateMutators.map((isolate) => isolate.start()));
+    final mutators = [
+      if (args['default_mutators']) ...defaultMutators,
+      ...isolateMutators
+    ];
+    if (mutators.isEmpty) {
+      print('No mutators specified. Aborting');
+      exit(1);
+    }
+    return WeightedOptions<WeightedMutator>(mutators, (m) => m.weight);
   }
 
   Future<void> _simplify(ArgResults args) async {

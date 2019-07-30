@@ -4,6 +4,15 @@
 
 import 'dart:math';
 
+import 'package:dust/src/mutator.dart';
+
+/// The default mutators to fuzz seeds in search of new cases.
+const defaultMutators = [
+  DefaultMutator(addChar),
+  DefaultMutator(flipChar),
+  DefaultMutator(removeChar)
+];
+
 /// Add a single random char to a random position in the [input] string.
 String addChar(String input, Random random) {
   final newchar = _randomChar(random);
@@ -22,20 +31,6 @@ String flipChar(String input, Random random) {
   return input.replaceRange(charpos, charpos + 1, newchar);
 }
 
-/// Perform a random mutation on the [input] String.
-String mutate(String input, Random random) {
-  switch (random.nextInt(3)) {
-    case 0:
-      return addChar(input, random);
-    case 1:
-      return flipChar(input, random);
-    case 2:
-      return removeChar(input, random);
-  }
-
-  throw Exception('should not be possible');
-}
-
 /// Remove a single random char in the [input] string.
 String removeChar(String input, Random random) {
   if (input.isEmpty) {
@@ -50,3 +45,15 @@ String _randomChar(Random random) =>
 
 int _randomPos(String s, Random random, [bool inclusive = false]) =>
     s.isEmpty ? 0 : random.nextInt(s.length + (inclusive ? 1 : 0));
+
+/// A default mutator with a default weight.
+class DefaultMutator implements WeightedMutator {
+  @override
+  final Mutator mutatorFn;
+
+  /// Construct a default mutator from a default function.
+  const DefaultMutator(this.mutatorFn);
+
+  @override
+  double get weight => 1;
+}

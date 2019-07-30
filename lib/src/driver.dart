@@ -9,10 +9,12 @@ import 'dart:math';
 import 'package:dust/src/controller.dart';
 import 'package:dust/src/failure.dart';
 import 'package:dust/src/failure_library.dart';
+import 'package:dust/src/mutator.dart';
 import 'package:dust/src/mutators.dart';
 import 'package:dust/src/pool.dart';
 import 'package:dust/src/seed.dart';
 import 'package:dust/src/seed_library.dart';
+import 'package:dust/src/weighted_random_choice.dart';
 
 /// Drives the main fuzz testing loop.
 ///
@@ -23,6 +25,7 @@ class Driver {
   final FailureLibrary _failures;
   final Random _random;
   final List<Controller> _runners;
+  final WeightedOptions<WeightedMutator> _mutators;
   final int _batchSize;
 
   final _successStreamCtrl = StreamController<void>();
@@ -32,7 +35,7 @@ class Driver {
 
   /// Construct a Driver to run fuzz testing.
   Driver(this._seeds, this._failures, this._batchSize, this._runners,
-      this._random);
+      this._mutators, this._random);
 
   /// Notifications for all non-unique fuzz [Failure] cases.
   Stream<Failure> get onDuplicateFail => _duplicateFailStreamCtrl.stream;
@@ -81,7 +84,7 @@ class Driver {
   }
 
   Future<void> _runCase(Controller runner, Seed seed) async {
-    final input = mutate(seed.input, _random);
+    final input = await mutate(seed.input, _random, _mutators);
     final result = await runner.run(input);
     if (!result.succeeded) {
       final failure = Failure(input, result);

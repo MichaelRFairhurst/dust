@@ -33,6 +33,47 @@ better performance.**
 There are some special options you can see with `pub global run dust --help` to
 configure how exactly the fuzzer runs.
 
+### Simplifying Cases
+
+You can simplify failing or non failing cases according to a simple character
+deletion search, and custom constraints. These constraints affect which
+simplifications are considered valid.
+
+```bash
+pub global run dust simplify path/to/script.dart input
+```
+
+There are useful constraints which default to off such as that no new paths are
+executed by the simplification, or that the error output from the case does not
+change.
+
+By default, it is assumed you are simplifying a failure, and
+`--constraint_failed` is therefore on by default. However, it may be disabled
+to simplify non-failing cases as well.
+
+### Custom Mutators
+
+The default mutators will add, remove, or flip a random character in your seeds
+in attempt to search for new seeds. To specify custom behavior, you can write a
+script that can be spawned as an isolate by the main process:
+
+```dart
+import 'dart:isolate';
+import 'package:dust/custom_mutator_helper.dart';
+
+main(args, SendPort sendPort) => customMutatorHelper(sendPort, (str) {
+  return ...; // mutate the string
+});
+```
+
+To use this script, provide the flag '--mutator_script=script.dart`.
+
+By default, each mutator (including the three default ones) have equal
+probability. However, you may set a weight on custom scripts by appending a `:`
+and then a double value, ie, `--mutator_script=script.dart:2.0`. The default
+mutators each have a weight of `1.0`, and may be disabled entirely by passing
+`--no_default_mutators`.
+
 ## Design
 
 Fuzz testing is often an excellent supplemental testing tool to add to programs
