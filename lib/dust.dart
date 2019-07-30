@@ -13,3 +13,5 @@ export 'package:dust/src/location_scorer.dart';
 export 'package:dust/src/result.dart';
 export 'package:dust/src/seed.dart';
 export 'package:dust/src/seed_library.dart';
+export 'package:dust/src/stats.dart';
+export 'package:dust/src/stats_collector.dart';

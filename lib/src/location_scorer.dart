@@ -3,6 +3,7 @@
 // BSD-style license that can be found in the LICENSE file.
 
 import 'dart:math';
+import 'dart:async';
 
 import 'package:dust/src/location.dart';
 
@@ -29,6 +30,11 @@ import 'package:dust/src/location.dart';
 class LocationScorer {
   final _locationOccurences = <Location, int>{};
 
+  final _newLocationCtrl = StreamController<void>.broadcast();
+
+  /// Get a stream of events for when new paths are discovered.
+  Stream<void> get onNewLocation => _newLocationCtrl.stream;
+
   final double _sensitivity;
 
   /// Create a new [LocationScorer] with the given sensitivity.
@@ -40,7 +46,10 @@ class LocationScorer {
 
   /// Report a [Location] for scoring later.
   void report(Location location) => _locationOccurences
-    ..update(location, (value) => ++value, ifAbsent: () => 1);
+    ..update(location, (value) => ++value, ifAbsent: () {
+      _newLocationCtrl.add(null);
+      return 1;
+    });
 
   /// Score a [Location] (higher is more unique).
   double score(Location location) =>

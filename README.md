@@ -145,17 +145,19 @@ The fuzzer works like so:
 
 # TODO
 
-[ ] normalize Location objects to reduce memory
-[ ] explore reusing isolates for better JITing. Locations will be cumulative
-    rather than unique. When a fuzz test hits a new Location, rerun it in a
-    fresh isolate.
-[ ] investigate adding support for coverage in AOT apps, which will speed up
-    running fuzz cases
-[ ] improve error handling for cases where the dart VM crashes etc
-[ ] add a timeout that's considered a failure
-[ ] [try different fuzz mutation techniques](https://lcamtuf.blogspot.com/2014/08/binary-fuzzing-strategies-what-works.html)
-[ ] add API for providing a script to do custom mutations
-[ ] add failure cases simplifiers
-[ ] add support for serializing fuzz failure cases
+- [ ] explore reusing isolates for better JITing. Locations will be cumulative
+      rather than unique. When a fuzz test hits a new Location, rerun it in a
+      fresh isolate.
+- [ ] investigate adding support for coverage in AOT apps, which will speed up
+      running fuzz cases
+- [ ] improve error handling for cases where the dart VM crashes etc
+- [ ] add a timeout that's considered a failure
+- [ ] [try different fuzz mutation techniques](https://lcamtuf.blogspot.com/2014/08/binary-fuzzing-strategies-what-works.html)
+- [ ] auto-snapshot scripts for users
+- [ ] improve coverage %
+- [ ] read & write seeds to files
+- [ ] some renames: Location should probably be Path, and Library should probably
+      be Corpus
+- [ ] targeted scoring for paths through certain files/packages/etc
 
 etc.

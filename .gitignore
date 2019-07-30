@@ -1,3 +1,5 @@
 .packages
 .dart_tool
 pubspec.lock
+example/*.snapshot*
+example/analyzer/bin/*.snapshot*

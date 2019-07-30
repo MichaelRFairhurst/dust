@@ -28,10 +28,10 @@ class Driver {
   final WeightedOptions<WeightedMutator> _mutators;
   final int _batchSize;
 
-  final _successStreamCtrl = StreamController<void>();
-  final _newSeedStreamCtrl = StreamController<Seed>();
-  final _uniqueFailStreamCtrl = StreamController<Failure>();
-  final _duplicateFailStreamCtrl = StreamController<Failure>();
+  final _successStreamCtrl = StreamController<void>.broadcast();
+  final _newSeedStreamCtrl = StreamController<Seed>.broadcast();
+  final _uniqueFailStreamCtrl = StreamController<Failure>.broadcast();
+  final _duplicateFailStreamCtrl = StreamController<Failure>.broadcast();
 
   /// Construct a Driver to run fuzz testing.
   Driver(this._seeds, this._failures, this._batchSize, this._runners,
@@ -80,7 +80,10 @@ class Driver {
 
   Future<void> _preseed(Controller runner, String seed) async {
     final result = await runner.run(seed);
-    _seeds.report(seed, result);
+    final newSeed = _seeds.report(seed, result);
+    if (newSeed != null) {
+      _newSeedStreamCtrl.add(newSeed);
+    }
   }
 
   Future<void> _runCase(Controller runner, Seed seed) async {

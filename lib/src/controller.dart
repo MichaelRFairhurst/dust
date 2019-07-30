@@ -65,20 +65,41 @@ class Controller {
     _serviceClient = await _connect();
   }
 
-  /// Run an individual case on a VM controller that's already been prestarted.
-  Future<Result> run(String input) async {
+  /// Count all locations that could be exercised for the target script.
+  Future<int> countLocations() async {
+    final fuzzIsolate = await _preRunCase('');
+
+    final locationCount = await _countLocations(fuzzIsolate);
+
+    await _finalizeOutput(fuzzIsolate);
+
+    return locationCount;
+  }
+
+  /// Continue [fuzzIsolate] to unblock the main isolate and get json output.
+  Future<Map<String, dynamic>> _finalizeOutput(Isolate fuzzIsolate) async {
+    await _serviceClient.resume(fuzzIsolate.id);
+    await _fuzzIsolateDead();
+
+    return await _exponentialBackoff(
+        () async => jsonDecode(_outputBuffer.toString().trim()), (_) => true);
+  }
+
+  /// Execute the [input] on the vm, but then pause to collect instrumentation.
+  Future<Isolate> _preRunCase(String input) async {
     _startTime = DateTime.now();
     _outputBuffer = StringBuffer();
     _process.stdin.writeln(jsonEncode(input));
-    final fuzz = await _fuzzIsolateComplete();
+    return _fuzzIsolateComplete();
+  }
 
-    final locations = await _getLocations(fuzz);
+  /// Run an individual case on a VM controller that's already been prestarted.
+  Future<Result> run(String input) async {
+    final fuzzIsolate = await _preRunCase(input);
 
-    await _serviceClient.resume(fuzz.id);
-    await _fuzzIsolateDead();
+    final locations = await _getLocations(fuzzIsolate);
 
-    final jsonOut = await _exponentialBackoff(
-        () async => jsonDecode(_outputBuffer.toString().trim()), (_) => true);
+    final jsonOut = await _finalizeOutput(fuzzIsolate);
 
     final bool succeeded = jsonOut['success'];
     if (succeeded) {
@@ -156,6 +177,23 @@ class Controller {
         () async => (await _serviceClient.getVM()).isolates,
         (isolates) =>
             !isolates.any((isolate) => isolate.name == 'fuzz_target'));
+  }
+
+  Future<int> _countLocations(Isolate isolate) async {
+    final scripts = await _serviceClient.getScripts(isolate.id);
+    var sum = 0;
+    for (final scriptRef in scripts.scripts) {
+      final coverage = await _serviceClient.getSourceReport(
+          isolate.id, [SourceReportKind.kCoverage],
+          scriptId: scriptRef.id);
+      for (final range in coverage.ranges) {
+        if (range.coverage == null) {
+          continue;
+        }
+        sum += range.coverage.hits.length + range.coverage.misses.length;
+      }
+    }
+    return sum;
   }
 
   Future<List<Location>> _getLocations(Isolate isolate) async {

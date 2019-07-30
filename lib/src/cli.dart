@@ -17,7 +17,10 @@ import 'package:dust/src/mutator.dart';
 import 'package:dust/src/mutators.dart';
 import 'package:dust/src/seed_library.dart';
 import 'package:dust/src/simplifier.dart';
+import 'package:dust/src/stats.dart';
+import 'package:dust/src/stats_collector.dart';
 import 'package:dust/src/weighted_random_choice.dart';
+import 'package:pedantic/pedantic.dart';
 
 /// Primary class for running the fuzzer on the CLI.
 class Cli {
@@ -48,6 +51,11 @@ class Cli {
         help: 'Whether to use the default mutators in addition to custom'
             ' mutators',
         defaultsTo: true)
+    ..addOption('stats_interval',
+        abbr: 'i',
+        help: 'The interval (in seconds) to print progress stats. Set to 0 to'
+            ' disable.',
+        defaultsTo: '30')
     ..addMultiOption(
       'mutator_script',
       abbr: 'm',
@@ -93,12 +101,14 @@ class Cli {
     int batchSize;
     int vms;
     int port;
+    int statsInterval;
     double locationSensitivity;
     try {
       batchSize = int.parse(args['batch_size']);
       vms = int.parse(args['vm_count']);
       port = int.parse(args['vm_starting_port']);
       locationSensitivity = double.parse(args['location_sensitivity']);
+      statsInterval = int.parse(args['stats_interval']);
     } catch (e) {
       print('invalid specified argument: $e');
       _usageAndExit();
@@ -116,9 +126,13 @@ class Cli {
           .toList();
 
       await Future.wait(runners.map((runner) => runner.prestart()));
+
+      final statsCollector =
+          StatsCollector(ProgramStats(await runners[0].countLocations()));
       final mutators = await _getMutators(args);
       final driver = Driver(
           seedLibrary, failureLibrary, batchSize, runners, mutators, Random());
+      statsCollector.collectFrom(driver, locationScorer);
 
       driver.onNewSeed.listen((seed) => print('\nNew seed: ${seed.input}'));
       driver.onSuccess.listen((_) => stdout.write('.'));
@@ -129,6 +143,8 @@ class Cli {
       if (seeds.isEmpty) {
         seeds.add('');
       }
+
+      _CliStats()._run(statsCollector, statsInterval);
       await driver.run(seeds);
     } finally {
       runners.forEach((runner) => runner.dispose());
@@ -209,7 +225,7 @@ class Cli {
         print('Simplified.\n$simplification');
       }
     } finally {
-      runner.dispose();
+      await runner.dispose();
     }
   }
 
@@ -220,5 +236,42 @@ class Cli {
     print('   or: pub global run dust simplify [options] script.dart input');
     print(_parser.commands['simplify'].usage);
     exit(1);
+  }
+}
+
+class _CliStats {
+  void _printStats(StatsCollector statsCollector) {
+    final stats = statsCollector.progressStats;
+    final duration = DateTime.now().difference(stats.startTime);
+
+    String format(double v) => v.toStringAsFixed(2);
+
+    print('''
+\n
+[=-- Status Report --=]
+Time elapsed: ${duration}
+Total executions: ${stats.numberOfExecutions} (${format(stats.numberOfExecutions / duration.inSeconds)}/s)
+Total seeds: ${stats.numberOfSeeds} (${format(stats.seedRate * 100)}%)
+Total failures: ${stats.numberOfFailures} (${format(stats.failureRate * 100)}%)
+Visited Paths: ${stats.visitedPaths}
+'''
+// TODO(mfairhusrt): Gather correct program coverage to get an accurate ratio.
+// (${format(stats.coverageRatio * 100)}%)
+        );
+  }
+
+  void _run(StatsCollector statsCollector, int intervalSeconds) {
+    if (intervalSeconds == 0) {
+      return;
+    }
+
+    final interval = Duration(seconds: intervalSeconds);
+
+    unawaited(() async {
+      while (true) {
+        await Future.delayed(interval);
+        _printStats(statsCollector);
+      }
+    }());
   }
 }
