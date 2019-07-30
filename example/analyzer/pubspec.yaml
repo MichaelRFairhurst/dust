@@ -8,8 +8,4 @@ environment:
   sdk: '>=2.1.0 <3.0.0'
 dependencies:
   analyzer: any
-  dust: '^1.0.0-beta.0'
-
-dependency_overrides:
-  dust:
-    path: ../../
+  dust: '^1.0.0-beta.1'
