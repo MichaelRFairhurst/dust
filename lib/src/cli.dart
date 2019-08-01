@@ -55,7 +55,12 @@ class Cli {
         abbr: 'i',
         help: 'The interval (in seconds) to print progress stats. Set to 0 to'
             ' disable.',
-        defaultsTo: '30')
+        defaultsTo: '120')
+    ..addOption('timeout',
+        abbr: 't',
+        help: 'The maximum duration (in seconds) before a test should be killed'
+            ' and considered a fail.',
+        defaultsTo: '10')
     ..addMultiOption(
       'mutator_script',
       abbr: 'm',
@@ -67,6 +72,11 @@ class Cli {
         ArgParser()
           ..addOption('port',
               abbr: 'p', help: 'The port for the VM', defaultsTo: '7575')
+          ..addOption('timeout',
+              abbr: 't',
+              help: 'The maximum duration (in seconds) before a test should be'
+                  ' killed and considered a fail.',
+              defaultsTo: '10')
           ..addFlag('constraint_subset_paths')
           ..addFlag('constraint_fewer_paths')
           ..addFlag('constraint_exact_paths')
@@ -102,6 +112,7 @@ class Cli {
     int vms;
     int port;
     int statsInterval;
+    int timeout;
     double locationSensitivity;
     try {
       batchSize = int.parse(args['batch_size']);
@@ -109,6 +120,7 @@ class Cli {
       port = int.parse(args['vm_starting_port']);
       locationSensitivity = double.parse(args['location_sensitivity']);
       statsInterval = int.parse(args['stats_interval']);
+      timeout = int.parse(args['timeout']);
     } catch (e) {
       print('invalid specified argument: $e');
       _usageAndExit();
@@ -122,7 +134,9 @@ class Cli {
       final seedLibrary = SeedLibrary(locationScorer);
       final failureLibrary = FailureLibrary();
       runners = Iterable.generate(
-              vms, (i) => Controller(script, port + i, locationCanonicalizer))
+              vms,
+              (i) =>
+                  Controller(script, port + i, timeout, locationCanonicalizer))
           .toList();
 
       await Future.wait(runners.map((runner) => runner.prestart()));
@@ -191,15 +205,17 @@ class Cli {
     final seed = args.rest[1];
 
     int port;
+    int timeout;
     try {
       port = int.parse(args['port']);
+      timeout = int.parse(args['timeout']);
     } catch (e) {
       print('invalid specified argument: $e');
       _usageAndExit();
     }
 
     final locationCanonicalizer = LocationCanonicalizer(compress: false);
-    final runner = Controller(script, port, locationCanonicalizer);
+    final runner = Controller(script, port, timeout, locationCanonicalizer);
     try {
       await runner.prestart();
       final result = await runner.run(seed);

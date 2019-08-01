@@ -151,7 +151,6 @@ The fuzzer works like so:
 - [ ] investigate adding support for coverage in AOT apps, which will speed up
       running fuzz cases
 - [ ] improve error handling for cases where the dart VM crashes etc
-- [ ] add a timeout that's considered a failure
 - [ ] [try different fuzz mutation techniques](https://lcamtuf.blogspot.com/2014/08/binary-fuzzing-strategies-what-works.html)
 - [ ] auto-snapshot scripts for users
 - [ ] improve coverage %
@@ -159,5 +158,10 @@ The fuzzer works like so:
 - [ ] some renames: Location should probably be Path, and Library should probably
       be Corpus
 - [ ] targeted scoring for paths through certain files/packages/etc
+- [ ] better (different?) simplification algorithm(s?)
+- [ ] store fuzzing optionsin script file (such as custom mutators, timeouts)
+- [ ] use locality sensitive hashing to dedupe failures with different messages
+      (or in the case of timeouts, the same messages) by jaccard index of their
+      code coverage sets. Perhaps from: https://arxiv.org/pdf/1811.04633
 
 etc.

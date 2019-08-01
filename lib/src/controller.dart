@@ -5,6 +5,7 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
+import 'dart:math';
 
 import 'package:dust/src/location.dart';
 import 'package:dust/src/location_canonicalizer.dart';
@@ -28,6 +29,7 @@ class Controller {
   final String _script;
   final String _host = 'localhost';
   final int _port;
+  final int _timeout;
   final LocationCanonicalizer _locationCanonicalizer;
   int _exitCode;
   VmService _serviceClient;
@@ -38,10 +40,22 @@ class Controller {
   Duration _timeElapsed;
 
   /// Construct a [Controller] from a script and a port.
-  Controller(this._script, this._port, this._locationCanonicalizer);
+  Controller(
+      this._script, this._port, this._timeout, this._locationCanonicalizer);
 
   /// Check if this VM is connected.
   bool get isConnected => _serviceClient != null;
+
+  /// Count all locations that could be exercised for the target script.
+  Future<int> countLocations() async {
+    final fuzzIsolate = await _preRunCase('');
+
+    final locationCount = await _countLocations(fuzzIsolate);
+
+    await _finalizeOutput(fuzzIsolate);
+
+    return locationCount;
+  }
 
   /// Kill the process & close the service connection.
   Future<void> dispose() async {
@@ -63,34 +77,6 @@ class Controller {
     _exitCode = null;
     await _startProcess();
     _serviceClient = await _connect();
-  }
-
-  /// Count all locations that could be exercised for the target script.
-  Future<int> countLocations() async {
-    final fuzzIsolate = await _preRunCase('');
-
-    final locationCount = await _countLocations(fuzzIsolate);
-
-    await _finalizeOutput(fuzzIsolate);
-
-    return locationCount;
-  }
-
-  /// Continue [fuzzIsolate] to unblock the main isolate and get json output.
-  Future<Map<String, dynamic>> _finalizeOutput(Isolate fuzzIsolate) async {
-    await _serviceClient.resume(fuzzIsolate.id);
-    await _fuzzIsolateDead();
-
-    return await _exponentialBackoff(
-        () async => jsonDecode(_outputBuffer.toString().trim()), (_) => true);
-  }
-
-  /// Execute the [input] on the vm, but then pause to collect instrumentation.
-  Future<Isolate> _preRunCase(String input) async {
-    _startTime = DateTime.now();
-    _outputBuffer = StringBuffer();
-    _process.stdin.writeln(jsonEncode(input));
-    return _fuzzIsolateComplete();
   }
 
   /// Run an individual case on a VM controller that's already been prestarted.
@@ -124,59 +110,15 @@ class Controller {
       }
     });
 
-    return _serviceClient;
-  }
-
-  Future<T> _exponentialBackoff<T>(
-      Future<T> Function() action, bool Function(T) accept,
-      {int limit = 90}) async {
-    var wait = Duration(milliseconds: 1);
-
-    dynamic reason;
-
-    var i = 0;
-    while (i++ < limit) {
-      if (_exitCode != null) {
-        throw Exception(
-            'VM at $_port exited with code $_exitCode:\n$_outputBuffer');
-      }
-
-      try {
-        final result = await action();
-        if (accept(result)) {
-          return result;
-        }
-        reason = 'not accepted';
-      } catch (e, st) {
-        reason = '$e $st';
-      }
-      await Future.delayed(wait);
-      wait += Duration(milliseconds: 1);
-    }
-
-    throw Exception('$limit tries exceeded: $reason');
-  }
-
-  Future<Isolate> _fuzzIsolateComplete() async {
-    final isolateRef = await _exponentialBackoff(
+    // Wait until the main isolate starts, to force an exception now if
+    // observatory can't start.
+    await _exponentialBackoff(
         () async => (await _serviceClient.getVM())
             .isolates
-            .singleWhere((isolate) => isolate.name == 'fuzz_target'),
+            .singleWhere((isolate) => isolate.name == 'main'),
         (isolate) => isolate != null);
 
-    final isolate = await _exponentialBackoff(
-        () async => _serviceClient.getIsolate(isolateRef.id),
-        (isolate) => isolate.pauseEvent.kind == 'PauseExit');
-
-    _timeElapsed ??= DateTime.now().difference(_startTime);
-    return isolate;
-  }
-
-  Future<void> _fuzzIsolateDead() async {
-    await _exponentialBackoff(
-        () async => (await _serviceClient.getVM()).isolates,
-        (isolates) =>
-            !isolates.any((isolate) => isolate.name == 'fuzz_target'));
+    return _serviceClient;
   }
 
   Future<int> _countLocations(Isolate isolate) async {
@@ -194,6 +136,68 @@ class Controller {
       }
     }
     return sum;
+  }
+
+  Future<T> _exponentialBackoff<T>(
+      Future<T> Function() action, bool Function(T) accept,
+      {Duration limit = const Duration(seconds: 5)}) async {
+    var wait = const Duration(milliseconds: 1);
+    final start = DateTime.now();
+
+    dynamic reason;
+
+    while (DateTime.now().difference(start) < limit) {
+      if (_exitCode != null) {
+        throw Exception(
+            'VM at $_port exited with code $_exitCode:\n$_outputBuffer');
+      }
+
+      try {
+        final result = await action();
+        if (accept(result)) {
+          return result;
+        }
+        reason = 'not accepted';
+      } catch (e, st) {
+        reason = '$e $st';
+      }
+      await Future.delayed(wait);
+      wait += const Duration(milliseconds: 1);
+    }
+
+    throw Exception('$limit tries exceeded: $reason');
+  }
+
+  /// Continue [fuzzIsolate] to unblock the main isolate and get json output.
+  Future<Map<String, dynamic>> _finalizeOutput(Isolate fuzzIsolate) async {
+    await _serviceClient.resume(fuzzIsolate.id);
+    await _fuzzIsolateDead();
+
+    return _exponentialBackoff(
+        () async => jsonDecode(_outputBuffer.toString().trim()), (_) => true);
+  }
+
+  Future<Isolate> _fuzzIsolateComplete() async {
+    final isolateRef = await _exponentialBackoff(
+        () async => (await _serviceClient.getVM())
+            .isolates
+            .singleWhere((isolate) => isolate.name == 'fuzz_target'),
+        (isolate) => isolate != null);
+
+    final isolate = await _exponentialBackoff(
+        () async => _serviceClient.getIsolate(isolateRef.id),
+        (isolate) => isolate.pauseEvent.kind == 'PauseExit',
+        limit: Duration(seconds: _timeout + 2));
+
+    _timeElapsed ??= DateTime.now().difference(_startTime);
+    return isolate;
+  }
+
+  Future<void> _fuzzIsolateDead() async {
+    await _exponentialBackoff(
+        () async => (await _serviceClient.getVM()).isolates,
+        (isolates) =>
+            !isolates.any((isolate) => isolate.name == 'fuzz_target'));
   }
 
   Future<List<Location>> _getLocations(Isolate isolate) async {
@@ -223,6 +227,14 @@ class Controller {
         .toList());
   }
 
+  /// Execute the [input] on the vm, but then pause to collect instrumentation.
+  Future<Isolate> _preRunCase(String input) async {
+    _startTime = DateTime.now();
+    _outputBuffer = StringBuffer();
+    _process.stdin.writeln(jsonEncode(input));
+    return _fuzzIsolateComplete();
+  }
+
   Future<void> _startProcess() async {
     final sdk = path.dirname(path.dirname(Platform.resolvedExecutable));
 
@@ -233,6 +245,7 @@ class Controller {
       path.join(Platform.environment['HOME'],
           '.pub-cache/global_packages/dust/bin/controller.dart.snapshot.dart2'),
       _script,
+      "$_timeout",
     ]);
 
     final vmCompleter = Completer();

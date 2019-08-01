@@ -7,8 +7,11 @@ import 'dart:convert';
 import 'dart:io';
 import 'dart:isolate';
 
+import 'package:pedantic/pedantic.dart';
+
 Future main(List<String> args) async {
   final isolateScript = args[0];
+  final timeout = args.length > 1 ? int.parse(args[1]) : 10;
   var pretext = '';
 
   stdin.listen((input) async {
@@ -39,11 +42,18 @@ Future main(List<String> args) async {
       };
 
       final isolateUri = Uri.base.resolve(isolateScript);
-      await Isolate.spawnUri(isolateUri, [value], null,
+      final isolate = await Isolate.spawnUri(isolateUri, [value], null,
           onError: onError.sendPort,
           onExit: onComplete.sendPort,
           debugName: 'fuzz_target');
 
+      unawaited(Future.delayed(Duration(seconds: timeout)).then((_) {
+        if (!isolateDone.isCompleted) {
+          isolate.kill(priority: Isolate.immediate);
+          succeeded = false;
+          output.write('timed out in ${timeout}s');
+        }
+      }));
       await isolateDone.future;
     } catch (e) {
       print(jsonEncode({'success': false, 'output': e.toString()}));
