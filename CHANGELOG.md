@@ -1,3 +1,9 @@
+* 1.0.0-beta.4
+
+- Switch seed loading/persistence to more of a libfuzzer in/out/merge model.
+- Added option to persist failures to a directory
+- Changed `compress_locations` abbreviation from `c` to `o`.
+
 * 1.0.0-beta.3
 
 - Added a configurable timeout per case.

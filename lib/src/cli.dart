@@ -10,11 +10,13 @@ import 'package:dust/src/controller.dart';
 import 'package:dust/src/driver.dart';
 import 'package:dust/src/failure.dart';
 import 'package:dust/src/failure_library.dart';
+import 'package:dust/src/failure_persistence.dart';
 import 'package:dust/src/isolate_mutator.dart';
 import 'package:dust/src/location_canonicalizer.dart';
 import 'package:dust/src/location_scorer.dart';
 import 'package:dust/src/mutator.dart';
 import 'package:dust/src/mutators.dart';
+import 'package:dust/src/seed_candidate.dart';
 import 'package:dust/src/seed_library.dart';
 import 'package:dust/src/seed_persistence.dart';
 import 'package:dust/src/simplifier.dart';
@@ -41,14 +43,18 @@ class Cli {
             ' more less unique locations',
         defaultsTo: '2.0')
     ..addFlag('compress_locations',
-        abbr: 'c',
+        abbr: 'o',
         help: 'Compress location IDs (uses less memory but is not reversible)')
     ..addMultiOption('seed',
         abbr: 's',
         help: 'An initial seed (allows multiple)',
         splitCommas: false)
     ..addOption('seed_dir',
-        abbr: 'd', help: 'An directory containing initial seeds')
+        abbr: 'd', help: 'A directory containing input seeds')
+    ..addOption('corpus_dir',
+        abbr: 'c', help: 'A directory containing output seeds')
+    ..addOption('failure_dir',
+        abbr: 'f', help: 'A directory to record failures')
     ..addFlag('default_mutators',
         abbr: 'u',
         help: 'Whether to use the default mutators in addition to custom'
@@ -129,11 +135,17 @@ class Cli {
       _usageAndExit();
     }
 
-    final seeds = args['seed'];
-    SeedPersistence seedPersistence;
-    if (args['seed_dir'] != null) {
-      seedPersistence = SeedPersistence(args['seed_dir']);
-      seeds.addAll(await seedPersistence.load());
+    final seeds = (args['seed'] as List<String>)
+        .map((seed) => SeedCandidate.forCommandLine(seed))
+        .toList();
+    final seedPersistence = SeedPersistence(
+        args['corpus_dir'] ?? '$script.corpus', args['seed_dir']);
+    seeds.addAll(await seedPersistence.load());
+
+    FailurePersistence failurePersistence;
+    if (args['failure_dir'] != null) {
+      failurePersistence = FailurePersistence(args['failure_dir']);
+      await failurePersistence.load();
     }
 
     List<Controller> runners;
@@ -160,14 +172,24 @@ class Cli {
 
       driver.onNewSeed.listen((seed) {
         print('\nNew seed: ${seed.input}');
-        seedPersistence?.recordGeneratedSeed(seed.input);
+        seedPersistence.recordToCorpus(seed.input);
+      });
+      driver.onSeedCandidateProcessed.listen((seed) {
+        if (seed.accepted && !seed.inCorpus) {
+          print('\nSeed added to corpus: ${seed.userString}');
+          seedPersistence.recordToCorpus(seed.input);
+        } else if (!seed.accepted) {
+          print('\nSeed not added to corpus: ${seed.userString}');
+        }
       });
       driver.onSuccess.listen((_) => stdout.write('.'));
       driver.onDuplicateFail.listen((_) => stdout.write('F'));
-      driver.onUniqueFail.listen((failure) =>
-          print('\nFAILURE: ${failure.input}\n${failure.result.errorOutput}'));
+      driver.onUniqueFail.listen((failure) {
+        print('\nFAILURE: ${failure.input}\n${failure.result.errorOutput}');
+        failurePersistence?.recordFailure(failure);
+      });
       if (seeds.isEmpty) {
-        seeds.add('');
+        seeds.add(SeedCandidate.initial());
       }
 
       _CliStats()._run(statsCollector, statsInterval);

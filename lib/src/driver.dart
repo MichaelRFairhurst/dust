@@ -13,6 +13,7 @@ import 'package:dust/src/mutator.dart';
 import 'package:dust/src/mutators.dart';
 import 'package:dust/src/pool.dart';
 import 'package:dust/src/seed.dart';
+import 'package:dust/src/seed_candidate.dart';
 import 'package:dust/src/seed_library.dart';
 import 'package:dust/src/weighted_random_choice.dart';
 
@@ -30,6 +31,8 @@ class Driver {
 
   final _successStreamCtrl = StreamController<void>.broadcast();
   final _newSeedStreamCtrl = StreamController<Seed>.broadcast();
+  final _seedCandidateProcessedStreamCtrl =
+      StreamController<SeedCandidate>.broadcast();
   final _uniqueFailStreamCtrl = StreamController<Failure>.broadcast();
   final _duplicateFailStreamCtrl = StreamController<Failure>.broadcast();
 
@@ -43,6 +46,10 @@ class Driver {
   /// Notifications for when new [Seed]s are discovered.
   Stream<Seed> get onNewSeed => _newSeedStreamCtrl.stream;
 
+  /// Notifications for when [SeedCandidate]s are processed.
+  Stream<SeedCandidate> get onSeedCandidateProcessed =>
+      _seedCandidateProcessedStreamCtrl.stream;
+
   /// Notifications for when cases pass without error.
   Stream<void> get onSuccess => _successStreamCtrl.stream;
 
@@ -50,12 +57,12 @@ class Driver {
   Stream<Failure> get onUniqueFail => _uniqueFailStreamCtrl.stream;
 
   /// Begin running the [Driver]
-  Future<void> run(List<String> seeds) async {
-    // run initial seeds
-    await Pool<Controller, String>(_runners, _preseed,
+  Future<void> run(List<SeedCandidate> inputs) async {
+    // run initial seed candidates
+    await Pool<Controller, SeedCandidate>(_runners, _preseed,
             handleError: (controller, seed, error) =>
                 throw Exception('failed to preseed $seed: $error'))
-        .consume(Queue.from(seeds));
+        .consume(Queue.from(inputs));
 
     final pool = Pool<Controller, Seed>(_runners, _runCase,
         handleError: (controller, seed, error) async {
@@ -78,12 +85,12 @@ class Driver {
     }
   }
 
-  Future<void> _preseed(Controller runner, String seed) async {
-    final result = await runner.run(seed);
-    final newSeed = _seeds.report(seed, result);
-    if (newSeed != null) {
-      _newSeedStreamCtrl.add(newSeed);
-    }
+  Future<void> _preseed(Controller runner, SeedCandidate seed) async {
+    final result = await runner.run(seed.input);
+    final newSeed = _seeds.report(seed.input, result);
+    seed.accepted = newSeed != null;
+
+    _seedCandidateProcessedStreamCtrl.add(seed);
   }
 
   Future<void> _runCase(Controller runner, Seed seed) async {

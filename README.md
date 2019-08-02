@@ -2,6 +2,8 @@
 
 A coverage-guided fuzz tester for Dart.
 
+_inspired by libFuzzer and AFL etc._
+
 ## Usage
 
 Simply write a dart program with a `main` function, and use the first argument
@@ -32,6 +34,29 @@ better performance.**
 
 There are some special options you can see with `pub global run dust --help` to
 configure how exactly the fuzzer runs.
+
+### The Corpus
+
+By default, when you run `dust` on some `script.dart`, it will create a
+directory named `script.dart.corpus` that contains interesting fuzz samples used
+to explore your program (this is how coverage-guided fuzzing works). This means
+you can stop fuzzing your program and restart without losing progress.
+
+You can specify manual seeds in one of two ways. You can either pass in seeds
+on the command-line, ie, `--seed foo --seed bar`, or you can pass in a seed
+directory (which may function much like a unit test directory) with
+`--seed_dir`.
+
+If you do not specify manual seeds, the corpus begins as a single seed that is
+the empty string `""`.
+
+When manually specifying seeds, they will only be added to the corpus if the
+coverage tool finds them interesting. Once interesting cases have been added to
+the corpus, you don't need to pass in those seeds again until your program
+perhaps changes in a meaningful way.
+
+A corpus can be reduced using this concept, by simply providing the flags
+`--seed_dir=old.corpus --corpus_dir=new.corpus`.
 
 ### Simplifying Cases
 
@@ -159,7 +184,8 @@ The fuzzer works like so:
       be Corpus
 - [ ] targeted scoring for paths through certain files/packages/etc
 - [ ] better (different?) simplification algorithm(s?)
-- [ ] store fuzzing optionsin script file (such as custom mutators, timeouts)
+- [ ] automatically simplify new seeds
+- [ ] store fuzzing options in script file (such as custom mutators, timeouts)
 - [ ] use locality sensitive hashing to dedupe failures with different messages
       (or in the case of timeouts, the same messages) by jaccard index of their
       code coverage sets. Perhaps from: https://arxiv.org/pdf/1811.04633

@@ -3,5 +3,7 @@
 pubspec.lock
 example/*.snapshot*
 example/analyzer/bin/*.snapshot*
-example/*out
-example/analyzer/*out
+example/*.corpus
+example/*.failures
+example/analyzer/*.corpus
+example/analyzer/*.failures

@@ -27,6 +27,12 @@ class StatsCollector {
       progressStats.numberOfFailures++;
     });
     driver.onNewSeed.listen((_) => progressStats.numberOfSeeds++);
+    driver.onSeedCandidateProcessed.listen((candidate) {
+      progressStats.numberOfExecutions++;
+      if (candidate.accepted) {
+        progressStats.numberOfSeeds++;
+      }
+    });
     locationScorer.onNewLocation.listen((_) => progressStats.visitedPaths++);
   }
 }

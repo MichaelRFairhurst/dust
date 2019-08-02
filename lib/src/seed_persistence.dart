@@ -5,45 +5,63 @@
 import 'dart:io';
 
 import 'package:crypto/crypto.dart';
+import 'package:dust/src/seed_candidate.dart';
+import 'package:meta/meta.dart';
+import 'package:path/path.dart' as path;
 
 /// Means of loading & persisting seeds (both hand-written and generated) from
 /// a directory.
 class SeedPersistence {
-  Directory _generatedSeedsFolder;
-  final String _path;
+  Directory _corpusDirectory;
+  final String _inputDirPath;
+  final String _corpusDirPath;
 
-  /// Create a [SeedPersistence] with the [_path] directory.
-  SeedPersistence(this._path);
+  /// Create a [SeedPersistence] with the [_inputDirPath] directory.
+  SeedPersistence(this._corpusDirPath, this._inputDirPath);
 
-  /// Load all seeds recursively within [_path], and
-  Future<List<String>> load() async {
-    final directory = Directory(_path);
-    if (!(await directory.exists())) {
-      throw "No surch directory $_path";
+  /// Load all seeds recursively within [_inputDirPath], and
+  Future<List<SeedCandidate>> load() async {
+    _corpusDirectory = Directory(_corpusDirPath);
+    if (!(await _corpusDirectory.exists())) {
+      await _corpusDirectory.create();
     }
 
-    final results = <String>[];
-    await for (final item
-        in directory.list(recursive: true, followLinks: true)) {
-      if (item is File) {
-        results.add(await item.readAsString());
+    final results = <SeedCandidate>[];
+
+    await _loadDirectory(_corpusDirectory, results, inCorpus: true);
+
+    if (_inputDirPath != null) {
+      final seedDirectory = Directory(_inputDirPath);
+      if (!(await seedDirectory.exists())) {
+        throw 'No such directory $_inputDirPath';
       }
-    }
 
-    _generatedSeedsFolder = Directory('$_path/_generated');
-    if (!(await _generatedSeedsFolder.exists())) {
-      await _generatedSeedsFolder.create();
+      await _loadDirectory(seedDirectory, results, inCorpus: false);
     }
 
     return results;
   }
 
   /// Save a new generated [seed] to the generated subdirectory.
-  Future<void> recordGeneratedSeed(String seed) async {
+  Future<void> recordToCorpus(String seed) async {
     final hash = md5.convert(seed.codeUnits).toString();
-    final file = File('${_generatedSeedsFolder.path}/$hash');
+    final file = File(path.join(_corpusDirectory.path, hash));
     if (!file.existsSync()) {
       await file.writeAsString(seed);
+    }
+  }
+
+  Future<void> _loadDirectory(Directory directory, List<SeedCandidate> results,
+      {@required bool inCorpus}) async {
+    await for (final item
+        in directory.list(recursive: true, followLinks: true)) {
+      if (item is File) {
+        try {
+          results.add(SeedCandidate.forFile(
+              await item.readAsString(), item.path,
+              inCorpus: inCorpus));
+        } catch (_) {}
+      }
     }
   }
 }

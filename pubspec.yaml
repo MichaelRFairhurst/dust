@@ -1,5 +1,5 @@
 name: dust
-version: 1.0.0-beta.3
+version: 1.0.0-beta.4
 description: Coverage-guided fuzz testing for Dart
 authors:
   - Mike Fairhurst <mfairhurst@google.com>
@@ -7,6 +7,7 @@ homepage: https://github.com/MichaelRFairhurst/dust.dart
 environment:
   sdk: '>=2.2.2 <3.0.0'
 dependencies:
+  meta: '^1.1.7'
   pedantic: '^1.8.0+1'
   crypto: '^2.0.6'
   args: '^1.5.2'
