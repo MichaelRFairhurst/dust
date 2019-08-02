@@ -16,6 +16,7 @@ import 'package:dust/src/location_scorer.dart';
 import 'package:dust/src/mutator.dart';
 import 'package:dust/src/mutators.dart';
 import 'package:dust/src/seed_library.dart';
+import 'package:dust/src/seed_persistence.dart';
 import 'package:dust/src/simplifier.dart';
 import 'package:dust/src/stats.dart';
 import 'package:dust/src/stats_collector.dart';
@@ -46,6 +47,8 @@ class Cli {
         abbr: 's',
         help: 'An initial seed (allows multiple)',
         splitCommas: false)
+    ..addOption('seed_dir',
+        abbr: 'd', help: 'An directory containing initial seeds')
     ..addFlag('default_mutators',
         abbr: 'u',
         help: 'Whether to use the default mutators in addition to custom'
@@ -126,6 +129,13 @@ class Cli {
       _usageAndExit();
     }
 
+    final seeds = args['seed'];
+    SeedPersistence seedPersistence;
+    if (args['seed_dir'] != null) {
+      seedPersistence = SeedPersistence(args['seed_dir']);
+      seeds.addAll(await seedPersistence.load());
+    }
+
     List<Controller> runners;
     try {
       final locationScorer = LocationScorer(locationSensitivity);
@@ -148,12 +158,14 @@ class Cli {
           seedLibrary, failureLibrary, batchSize, runners, mutators, Random());
       statsCollector.collectFrom(driver, locationScorer);
 
-      driver.onNewSeed.listen((seed) => print('\nNew seed: ${seed.input}'));
+      driver.onNewSeed.listen((seed) {
+        print('\nNew seed: ${seed.input}');
+        seedPersistence?.recordGeneratedSeed(seed.input);
+      });
       driver.onSuccess.listen((_) => stdout.write('.'));
       driver.onDuplicateFail.listen((_) => stdout.write('F'));
       driver.onUniqueFail.listen((failure) =>
           print('\nFAILURE: ${failure.input}\n${failure.result.errorOutput}'));
-      final seeds = args['seed'];
       if (seeds.isEmpty) {
         seeds.add('');
       }

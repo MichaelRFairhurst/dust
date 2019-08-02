@@ -154,7 +154,7 @@ The fuzzer works like so:
 - [ ] [try different fuzz mutation techniques](https://lcamtuf.blogspot.com/2014/08/binary-fuzzing-strategies-what-works.html)
 - [ ] auto-snapshot scripts for users
 - [ ] improve coverage %
-- [ ] read & write seeds to files
+- [ ] cull seeds that are no longer unique
 - [ ] some renames: Location should probably be Path, and Library should probably
       be Corpus
 - [ ] targeted scoring for paths through certain files/packages/etc

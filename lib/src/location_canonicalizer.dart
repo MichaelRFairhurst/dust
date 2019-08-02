@@ -56,5 +56,5 @@ class LocationCanonicalizer {
   ///
   /// TODO(mfairhurst): investigate lossless compression.
   String _compressScriptUri(String scriptUri) =>
-      String.fromCharCodes(md5.convert(scriptUri.codeUnits).bytes);
+      md5.convert(scriptUri.codeUnits).toString();
 }
