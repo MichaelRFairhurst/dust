@@ -5,26 +5,26 @@
 import 'dart:math';
 
 import 'package:crypto/crypto.dart';
-import 'package:dust/src/location.dart';
+import 'package:dust/src/path.dart';
 
-/// Utility to reduce memory by canonicalizing/normalizing [Location]s.
-class LocationCanonicalizer {
+/// Utility to reduce memory by canonicalizing/normalizing [Path]s.
+class PathCanonicalizer {
   final bool _compress;
-  final _locations = <Location>{};
-  final _paths = <String>{};
+  final _paths = <Path>{};
+  final _scripts = <String>{};
 
   /// Create a canonicalizer which optionally compresses URIs as well.
-  LocationCanonicalizer({bool compress = false}) : _compress = compress;
+  PathCanonicalizer({bool compress = false}) : _compress = compress;
 
-  /// Add this Location to the canonical pool and/or return the canonical
+  /// Add this Path to the canonical pool and/or return the canonical
   /// version.
-  Location canonicalize(Location location) {
-    final preexisting = _locations.lookup(location);
+  Path canonicalize(Path path) {
+    final preexisting = _paths.lookup(path);
     if (preexisting != null) {
       return preexisting;
     }
-    _locations.add(location);
-    return location;
+    _paths.add(path);
+    return path;
   }
 
   /// Clean up a VM script URI into a lower memory, compressed or human readable
@@ -35,14 +35,14 @@ class LocationCanonicalizer {
   /// Add this script URI to the canonical pool and/or return the canonical
   /// version.
   ///
-  /// Many locations will share potentially tens of thousands of [Location]s
+  /// Many paths will share potentially tens of thousands of [Path]s
   /// that differ only in script URI.
   String _canonicalizeScriptName(String scriptUri) {
-    final preexisting = _paths.lookup(scriptUri);
+    final preexisting = _scripts.lookup(scriptUri);
     if (preexisting != null) {
       return preexisting;
     }
-    _paths.add(scriptUri);
+    _scripts.add(scriptUri);
     return scriptUri;
   }
 

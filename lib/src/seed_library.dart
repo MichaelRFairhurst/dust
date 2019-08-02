@@ -4,10 +4,11 @@
 
 import 'dart:math';
 
-import 'package:dust/src/location_scorer.dart';
-import 'package:dust/src/result.dart';
+import 'package:dust/src/path.dart';
+import 'package:dust/src/path_scorer.dart';
 import 'package:dust/src/seed.dart';
 import 'package:dust/src/seed_scorer.dart';
+import 'package:dust/src/vm_result.dart';
 import 'package:dust/src/weighted_random_choice.dart';
 
 /// Manage [Seed]s, from choosing them randomly to rescoring them to adding new
@@ -19,19 +20,19 @@ class SeedLibrary {
   int _needsRescore = 0;
   int _rescoreInterval = 3;
   final SeedScorer _scorer;
-  final LocationScorer _locationScorer;
+  final PathScorer _pathScorer;
 
-  /// Create a [SeedLibrary] with a custom [LocationScorer].
-  factory SeedLibrary(LocationScorer locationScorer) {
+  /// Create a [SeedLibrary] with a custom [PathScorer].
+  factory SeedLibrary(PathScorer pathScorer) {
     final seeds = <Seed>[];
     final weightedSeeds = WeightedOptions<Seed>(seeds, (seed) => seed.score);
 
     return SeedLibrary._(
-        SeedScorer(locationScorer), locationScorer, seeds, weightedSeeds);
+        SeedScorer(pathScorer), pathScorer, seeds, weightedSeeds);
   }
 
   SeedLibrary._(
-      this._scorer, this._locationScorer, this._seeds, this._weightedSeeds);
+      this._scorer, this._pathScorer, this._seeds, this._weightedSeeds);
 
   /// Get the next batch of [n] [Seed]s, randomly chosen by their scores.
   List<Seed> getBatch(int n, Random random) {
@@ -41,14 +42,14 @@ class SeedLibrary {
     return seeds;
   }
 
-  /// Report a [Result] and potentially add it as a new [Seed].
+  /// Report a [VmResult] and potentially add it as a new [Seed].
   ///
-  /// If the [Result] is added as a new [Seed], that new [Seed] is returned.
-  Seed report(String input, Result result) {
-    final keepResult = result.locations.any(_locationScorer.isNew);
-    result.locations.forEach(_locationScorer.report);
+  /// If the [VmResult] is added as a new [Seed], that new [Seed] is returned.
+  Seed report(String input, VmResult result) {
+    final keepVmResult = result.paths.any(_pathScorer.isNew);
+    result.paths.forEach(_pathScorer.report);
 
-    if (keepResult) {
+    if (keepVmResult) {
       final seed = Seed(input, result);
       _addSeed(seed);
       return seed;
@@ -56,6 +57,11 @@ class SeedLibrary {
 
     return null;
   }
+
+  /// Get the unique paths for this result (making it worthy of being a new
+  /// seed).
+  List<Path> uniquePaths(VmResult result) =>
+      result.paths.where(_pathScorer.isNew).toList();
 
   void _addSeed(Seed seed) {
     _potentiallyRescore();

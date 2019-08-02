@@ -18,13 +18,13 @@ class SeedCandidate {
   /// Whether this seed candidate was accepted.
   bool accepted;
 
-  /// Create a candidate that a user entered on the command line.
-  SeedCandidate.forCommandLine(this.input)
-      : filename = null,
-        inCorpus = false;
-
   /// Create a candidate that came from a file, potentially [inCorpus].
   SeedCandidate.forFile(this.input, this.filename, {@required this.inCorpus});
+
+  /// Create a candidate that a user entered on the command line.
+  SeedCandidate.forText(this.input)
+      : filename = null,
+        inCorpus = false;
 
   /// Create an initial candidate if corpus is empty and no candidates provided.
   SeedCandidate.initial()

@@ -184,6 +184,7 @@ The fuzzer works like so:
       be Corpus
 - [ ] targeted scoring for paths through certain files/packages/etc
 - [ ] better (different?) simplification algorithm(s?)
+- [ ] automatic detection of simpler seeds during fuzzing?
 - [ ] automatically simplify new seeds
 - [ ] store fuzzing options in script file (such as custom mutators, timeouts)
 - [ ] use locality sensitive hashing to dedupe failures with different messages

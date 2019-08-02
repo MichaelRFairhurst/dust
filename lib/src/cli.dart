@@ -6,22 +6,28 @@ import 'dart:io';
 import 'dart:math';
 
 import 'package:args/args.dart';
-import 'package:dust/src/controller.dart';
 import 'package:dust/src/driver.dart';
-import 'package:dust/src/failure.dart';
 import 'package:dust/src/failure_library.dart';
 import 'package:dust/src/failure_persistence.dart';
+import 'package:dust/src/input_result.dart';
 import 'package:dust/src/isolate_mutator.dart';
-import 'package:dust/src/location_canonicalizer.dart';
-import 'package:dust/src/location_scorer.dart';
 import 'package:dust/src/mutator.dart';
 import 'package:dust/src/mutators.dart';
+import 'package:dust/src/path_canonicalizer.dart';
+import 'package:dust/src/path_scorer.dart';
 import 'package:dust/src/seed_candidate.dart';
 import 'package:dust/src/seed_library.dart';
 import 'package:dust/src/seed_persistence.dart';
-import 'package:dust/src/simplifier.dart';
+import 'package:dust/src/simplify/exact_paths_constraint.dart';
+import 'package:dust/src/simplify/fewer_paths_constraint.dart';
+import 'package:dust/src/simplify/output_constraint.dart';
+import 'package:dust/src/simplify/simplifier.dart';
+import 'package:dust/src/simplify/simplifier.dart';
+import 'package:dust/src/simplify/subset_paths_constraint.dart';
+import 'package:dust/src/simplify/succeeded_constraint.dart';
 import 'package:dust/src/stats.dart';
 import 'package:dust/src/stats_collector.dart';
+import 'package:dust/src/vm_controller.dart';
 import 'package:dust/src/weighted_random_choice.dart';
 import 'package:pedantic/pedantic.dart';
 
@@ -37,14 +43,14 @@ class Cli {
         abbr: 'p',
         help: 'The base port for VMs (port is incremented by 1 per vm)',
         defaultsTo: '7575')
-    ..addOption('location_sensitivity',
+    ..addOption('path_sensitivity',
         abbr: 'e',
-        help: 'The sensitivity of preferring fewer more unique locations vs'
-            ' more less unique locations',
+        help: 'The sensitivity of preferring fewer more unique paths vs more'
+            ' less unique paths',
         defaultsTo: '2.0')
-    ..addFlag('compress_locations',
+    ..addFlag('compress_paths',
         abbr: 'o',
-        help: 'Compress location IDs (uses less memory but is not reversible)')
+        help: 'Compress path IDs (uses less memory but is not reversible)')
     ..addMultiOption('seed',
         abbr: 's',
         help: 'An initial seed (allows multiple)',
@@ -122,12 +128,12 @@ class Cli {
     int port;
     int statsInterval;
     int timeout;
-    double locationSensitivity;
+    double pathSensitivity;
     try {
       batchSize = int.parse(args['batch_size']);
       vms = int.parse(args['vm_count']);
       port = int.parse(args['vm_starting_port']);
-      locationSensitivity = double.parse(args['location_sensitivity']);
+      pathSensitivity = double.parse(args['path_sensitivity']);
       statsInterval = int.parse(args['stats_interval']);
       timeout = int.parse(args['timeout']);
     } catch (e) {
@@ -136,7 +142,7 @@ class Cli {
     }
 
     final seeds = (args['seed'] as List<String>)
-        .map((seed) => SeedCandidate.forCommandLine(seed))
+        .map((seed) => SeedCandidate.forText(seed))
         .toList();
     final seedPersistence = SeedPersistence(
         args['corpus_dir'] ?? '$script.corpus', args['seed_dir']);
@@ -148,27 +154,26 @@ class Cli {
       await failurePersistence.load();
     }
 
-    List<Controller> runners;
+    List<VmController> vmControllers;
     try {
-      final locationScorer = LocationScorer(locationSensitivity);
-      final locationCanonicalizer =
-          LocationCanonicalizer(compress: args['compress_locations']);
-      final seedLibrary = SeedLibrary(locationScorer);
+      final pathScorer = PathScorer(pathSensitivity);
+      final pathCanonicalizer =
+          PathCanonicalizer(compress: args['compress_paths']);
+      final seedLibrary = SeedLibrary(pathScorer);
       final failureLibrary = FailureLibrary();
-      runners = Iterable.generate(
-              vms,
-              (i) =>
-                  Controller(script, port + i, timeout, locationCanonicalizer))
+      vmControllers = Iterable.generate(vms,
+              (i) => VmController(script, port + i, timeout, pathCanonicalizer))
           .toList();
 
-      await Future.wait(runners.map((runner) => runner.prestart()));
+      await Future.wait(
+          vmControllers.map((vmController) => vmController.prestart()));
 
       final statsCollector =
-          StatsCollector(ProgramStats(await runners[0].countLocations()));
+          StatsCollector(ProgramStats(await vmControllers[0].countPaths()));
       final mutators = await _getMutators(args);
-      final driver = Driver(
-          seedLibrary, failureLibrary, batchSize, runners, mutators, Random());
-      statsCollector.collectFrom(driver, locationScorer);
+      final driver = Driver(seedLibrary, failureLibrary, batchSize,
+          vmControllers, mutators, Random());
+      statsCollector.collectFrom(driver, pathScorer);
 
       driver.onNewSeed.listen((seed) {
         print('\nNew seed: ${seed.input}');
@@ -195,7 +200,7 @@ class Cli {
       _CliStats()._run(statsCollector, statsInterval);
       await driver.run(seeds);
     } finally {
-      runners.forEach((runner) => runner.dispose());
+      vmControllers.forEach((vmController) => vmController.dispose());
     }
   }
 
@@ -248,23 +253,27 @@ class Cli {
       _usageAndExit();
     }
 
-    final locationCanonicalizer = LocationCanonicalizer(compress: false);
-    final runner = Controller(script, port, timeout, locationCanonicalizer);
+    final pathCanonicalizer = PathCanonicalizer(compress: false);
+    final vmController = VmController(script, port, timeout, pathCanonicalizer);
     try {
-      await runner.prestart();
-      final result = await runner.run(seed);
+      await vmController.prestart();
+      final result = await vmController.run(seed);
       if (result.succeeded && args['constraint_failed']) {
         print('Error: seed $seed did not fail, cannot be simplified.');
         return;
       }
-      // TODO(mfairhurst): this will fail an assert for --no-constraint-failed
-      final failure = Failure(seed, await runner.run(seed));
-      final simplifier = Simplifier(failure, runner, [
-        if (args['constraint_failed']) SimplifierConstraint.failed,
-        if (args['constraint_subset_paths']) SimplifierConstraint.subsetPaths,
-        if (args['constraint_fewer_paths']) SimplifierConstraint.fewerPaths,
-        if (args['constraint_exact_paths']) SimplifierConstraint.exactPaths,
-        if (args['constraint_same_output']) SimplifierConstraint.sameOutput,
+      final originalInputResult =
+          InputResult(seed, await vmController.run(seed));
+      final simplifier = Simplifier(originalInputResult, vmController, [
+        if (args['constraint_failed']) SucceededConstraint.failed(),
+        if (args['constraint_subset_paths'])
+          SubsetPathsConstraint.ofResult(originalInputResult.result),
+        if (args['constraint_fewer_paths'])
+          FewerPathsConstraint.thanResult(originalInputResult.result),
+        if (args['constraint_exact_paths'])
+          ExactPathsConstraint.sameAs(originalInputResult.result),
+        if (args['constraint_same_output'])
+          OutputConstraint.sameAs(originalInputResult.result),
       ]);
 
       final simplification = await simplifier.simplify();
@@ -275,7 +284,7 @@ class Cli {
         print('Simplified.\n$simplification');
       }
     } finally {
-      await runner.dispose();
+      await vmController.dispose();
     }
   }
 

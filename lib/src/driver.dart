@@ -6,15 +6,17 @@ import 'dart:async';
 import 'dart:collection';
 import 'dart:math';
 
-import 'package:dust/src/controller.dart';
-import 'package:dust/src/failure.dart';
 import 'package:dust/src/failure_library.dart';
+import 'package:dust/src/input_result.dart';
 import 'package:dust/src/mutator.dart';
 import 'package:dust/src/mutators.dart';
 import 'package:dust/src/pool.dart';
 import 'package:dust/src/seed.dart';
 import 'package:dust/src/seed_candidate.dart';
 import 'package:dust/src/seed_library.dart';
+import 'package:dust/src/simplify/simplifier.dart';
+import 'package:dust/src/simplify/superset_paths_constraint.dart';
+import 'package:dust/src/vm_controller.dart';
 import 'package:dust/src/weighted_random_choice.dart';
 
 /// Drives the main fuzz testing loop.
@@ -25,7 +27,7 @@ class Driver {
   final SeedLibrary _seeds;
   final FailureLibrary _failures;
   final Random _random;
-  final List<Controller> _runners;
+  final List<VmController> _runners;
   final WeightedOptions<WeightedMutator> _mutators;
   final int _batchSize;
 
@@ -33,15 +35,15 @@ class Driver {
   final _newSeedStreamCtrl = StreamController<Seed>.broadcast();
   final _seedCandidateProcessedStreamCtrl =
       StreamController<SeedCandidate>.broadcast();
-  final _uniqueFailStreamCtrl = StreamController<Failure>.broadcast();
-  final _duplicateFailStreamCtrl = StreamController<Failure>.broadcast();
+  final _uniqueFailStreamCtrl = StreamController<InputResult>.broadcast();
+  final _duplicateFailStreamCtrl = StreamController<InputResult>.broadcast();
 
   /// Construct a Driver to run fuzz testing.
   Driver(this._seeds, this._failures, this._batchSize, this._runners,
       this._mutators, this._random);
 
-  /// Notifications for all non-unique fuzz [Failure] cases.
-  Stream<Failure> get onDuplicateFail => _duplicateFailStreamCtrl.stream;
+  /// Notifications for all non-unique fuzz [InputResult] cases.
+  Stream<InputResult> get onDuplicateFail => _duplicateFailStreamCtrl.stream;
 
   /// Notifications for when new [Seed]s are discovered.
   Stream<Seed> get onNewSeed => _newSeedStreamCtrl.stream;
@@ -53,18 +55,18 @@ class Driver {
   /// Notifications for when cases pass without error.
   Stream<void> get onSuccess => _successStreamCtrl.stream;
 
-  /// Notifications fo new and unique fuzz [Failure] cases.
-  Stream<Failure> get onUniqueFail => _uniqueFailStreamCtrl.stream;
+  /// Notifications fo new and unique fuzz [InputResult] cases.
+  Stream<InputResult> get onUniqueFail => _uniqueFailStreamCtrl.stream;
 
   /// Begin running the [Driver]
   Future<void> run(List<SeedCandidate> inputs) async {
     // run initial seed candidates
-    await Pool<Controller, SeedCandidate>(_runners, _preseed,
+    await Pool<VmController, SeedCandidate>(_runners, _preseed,
             handleError: (controller, seed, error) =>
                 throw Exception('failed to preseed $seed: $error'))
         .consume(Queue.from(inputs));
 
-    final pool = Pool<Controller, Seed>(_runners, _runCase,
+    final pool = Pool<VmController, Seed>(_runners, _runCase,
         handleError: (controller, seed, error) async {
       // TODO(mfairhurst): report this some other way.
       print('error with ${seed.input}: $error');
@@ -85,29 +87,56 @@ class Driver {
     }
   }
 
-  Future<void> _preseed(Controller runner, SeedCandidate seed) async {
-    final result = await runner.run(seed.input);
-    final newSeed = _seeds.report(seed.input, result);
-    seed.accepted = newSeed != null;
-
-    _seedCandidateProcessedStreamCtrl.add(seed);
+  Future<Seed> _potentialSeed(InputResult original, VmController runner) async {
+    final result = original.result;
+    final input = original.input;
+    final uniquePaths = _seeds.uniquePaths(result);
+    if (uniquePaths.isNotEmpty) {
+      final simplifier = Simplifier(
+          original, runner, [SupersetPathsConstraint(uniquePaths.toSet())]);
+      final simplified = await simplifier.simplify();
+      // TODO: don't rerun here.
+      final newResult = await runner.run(input);
+      return _seeds.report(simplified, newResult);
+    }
+    return null;
   }
 
-  Future<void> _runCase(Controller runner, Seed seed) async {
+  Future<void> _preseed(VmController runner, SeedCandidate seed) async {
+    final result = await runner.run(seed.input);
+    final newSeed = seed.inCorpus
+        ? _seeds.report(seed.input, result)
+        : await _potentialSeed(InputResult(seed.input, result), runner);
+    var broadcastSeed = seed;
+    if (newSeed != null) {
+      if (newSeed.input != seed.input) {
+        broadcastSeed = SeedCandidate.forText(newSeed.input);
+      }
+      broadcastSeed.accepted = true;
+    } else {
+      broadcastSeed.accepted = false;
+    }
+
+    _seedCandidateProcessedStreamCtrl.add(broadcastSeed);
+  }
+
+  Future<void> _runCase(VmController runner, Seed seed) async {
     final input = await mutate(seed.input, _random, _mutators);
     final result = await runner.run(input);
+    final inputResult = InputResult(input, result);
     if (!result.succeeded) {
-      final failure = Failure(input, result);
-      final previousFailure = _failures.report(failure);
+      final previousFailure = _failures.report(inputResult);
       if (previousFailure == null) {
-        _uniqueFailStreamCtrl.add(failure);
+        _uniqueFailStreamCtrl.add(inputResult);
       } else {
-        _duplicateFailStreamCtrl.add(failure);
+        _duplicateFailStreamCtrl.add(inputResult);
       }
     }
 
     _successStreamCtrl.add(null);
-    final newSeed = _seeds.report(input, result);
+
+    final newSeed = await _potentialSeed(inputResult, runner);
+    // Edge case: new seed may no longer be new.
     if (newSeed != null) {
       _newSeedStreamCtrl.add(newSeed);
     }

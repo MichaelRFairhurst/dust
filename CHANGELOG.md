@@ -1,3 +1,6 @@
+- Automatic simplification of seeds
+- Better simplification algorithm
+
 * 1.0.0-beta.4
 
 - Switch seed loading/persistence to more of a libfuzzer in/out/merge model.

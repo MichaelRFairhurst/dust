@@ -7,9 +7,9 @@ import 'dart:convert';
 import 'dart:io';
 import 'dart:math';
 
-import 'package:dust/src/location.dart';
-import 'package:dust/src/location_canonicalizer.dart';
-import 'package:dust/src/result.dart';
+import 'package:dust/src/path.dart';
+import 'package:dust/src/path_canonicalizer.dart';
+import 'package:dust/src/vm_result.dart';
 import 'package:path/path.dart' as path;
 import 'package:pedantic/pedantic.dart';
 import 'package:vm_service_lib/vm_service_lib.dart';
@@ -25,12 +25,12 @@ import 'package:vm_service_lib/vm_service_lib_io.dart';
 /// isolate named 'fuzz_target'. This class collects the instrumentation data
 /// from that isolate before closing it, at which point the controller script
 /// reports back any failure information.
-class Controller {
+class VmController {
   final String _script;
   final String _host = 'localhost';
   final int _port;
   final int _timeout;
-  final LocationCanonicalizer _locationCanonicalizer;
+  final PathCanonicalizer _pathCanonicalizer;
   int _exitCode;
   VmService _serviceClient;
   Process _process;
@@ -39,22 +39,22 @@ class Controller {
   Future<void> _processExit;
   Duration _timeElapsed;
 
-  /// Construct a [Controller] from a script and a port.
-  Controller(
-      this._script, this._port, this._timeout, this._locationCanonicalizer);
+  /// Construct a [VmController] from a script and a port.
+  VmController(
+      this._script, this._port, this._timeout, this._pathCanonicalizer);
 
   /// Check if this VM is connected.
   bool get isConnected => _serviceClient != null;
 
-  /// Count all locations that could be exercised for the target script.
-  Future<int> countLocations() async {
+  /// Count all paths that could be exercised for the target script.
+  Future<int> countPaths() async {
     final fuzzIsolate = await _preRunCase('');
 
-    final locationCount = await _countLocations(fuzzIsolate);
+    final pathCount = await _countPath(fuzzIsolate);
 
     await _finalizeOutput(fuzzIsolate);
 
-    return locationCount;
+    return pathCount;
   }
 
   /// Kill the process & close the service connection.
@@ -80,18 +80,18 @@ class Controller {
   }
 
   /// Run an individual case on a VM controller that's already been prestarted.
-  Future<Result> run(String input) async {
+  Future<VmResult> run(String input) async {
     final fuzzIsolate = await _preRunCase(input);
 
-    final locations = await _getLocations(fuzzIsolate);
+    final paths = await _getPath(fuzzIsolate);
 
     final jsonOut = await _finalizeOutput(fuzzIsolate);
 
     final bool succeeded = jsonOut['success'];
     if (succeeded) {
-      return Result(_timeElapsed, locations);
+      return VmResult(_timeElapsed, paths);
     } else {
-      return Result.failed(jsonOut['output'], _timeElapsed, locations);
+      return VmResult.failed(jsonOut['output'], _timeElapsed, paths);
     }
   }
 
@@ -121,7 +121,7 @@ class Controller {
     return _serviceClient;
   }
 
-  Future<int> _countLocations(Isolate isolate) async {
+  Future<int> _countPath(Isolate isolate) async {
     final scripts = await _serviceClient.getScripts(isolate.id);
     var sum = 0;
     for (final scriptRef in scripts.scripts) {
@@ -200,7 +200,7 @@ class Controller {
             !isolates.any((isolate) => isolate.name == 'fuzz_target'));
   }
 
-  Future<List<Location>> _getLocations(Isolate isolate) async {
+  Future<List<Path>> _getPath(Isolate isolate) async {
     final scripts = await _serviceClient.getScripts(isolate.id);
     return Future.wait(
       scripts.scripts.map(
@@ -213,15 +213,15 @@ class Controller {
           (sourceReport) => sourceReport.ranges.expand(
             (range) =>
                 range.coverage?.hits?.map(
-                  (id) => _locationCanonicalizer.canonicalize(
-                    Location(
-                      _locationCanonicalizer
+                  (id) => _pathCanonicalizer.canonicalize(
+                    Path(
+                      _pathCanonicalizer
                           .processScriptUri(sourceReport.scripts[0]?.id ?? ""),
                       id,
                     ),
                   ),
                 ) ??
-                <Location>[],
+                <Path>[],
           ),
         )
         .toList());

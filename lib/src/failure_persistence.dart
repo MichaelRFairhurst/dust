@@ -5,7 +5,7 @@
 import 'dart:io';
 
 import 'package:crypto/crypto.dart';
-import 'package:dust/src/failure.dart';
+import 'package:dust/src/input_result.dart';
 import 'package:path/path.dart' as path;
 
 /// Records failures to a directory by hash with error output.
@@ -25,7 +25,8 @@ class FailurePersistence {
   }
 
   /// Save a new failure to the generated subdirectory.
-  Future<void> recordFailure(Failure failure) async {
+  Future<void> recordFailure(InputResult failure) async {
+    assert(!failure.result.succeeded);
     final hash = md5.convert(failure.input.codeUnits).toString();
     final file = File(path.join(_directory.path, hash));
     if (!file.existsSync()) {

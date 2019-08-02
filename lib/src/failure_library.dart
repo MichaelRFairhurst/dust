@@ -4,16 +4,16 @@
 
 import 'dart:collection';
 
-import 'package:dust/src/failure.dart';
-import 'package:dust/src/location.dart';
+import 'package:dust/src/input_result.dart';
 
 /// A way to collect and dedupe failures
 class FailureLibrary {
   /// Previous failures indexed by their truncated error output.
-  final _previousFailuresByOutput = <String, Failure>{};
+  final _previousInputResultsByOutput = <String, InputResult>{};
 
-  /// Report a [Failure], and returns its original if it exists.
-  Failure report(Failure failure) {
+  /// Report a [InputResult], and returns its original if it exists.
+  InputResult report(InputResult failure) {
+    assert(!failure.result.succeeded);
     var error = failure.result.errorOutput;
     if (error.startsWith('timed out')) {
       // TODO: use LSH to do near-duplicate detection by coverage.
@@ -21,12 +21,12 @@ class FailureLibrary {
     }
 
     error = error.substring(0, error.length > 500 ? 500 : error.length);
-    if (_previousFailuresByOutput.keys.contains(error)) {
-      return _previousFailuresByOutput[error];
+    if (_previousInputResultsByOutput.keys.contains(error)) {
+      return _previousInputResultsByOutput[error];
     }
 
     // TODO: fall back to LSH to do near-duplicate detection by coverage.
-    _previousFailuresByOutput[error] = failure;
+    _previousInputResultsByOutput[error] = failure;
     return null;
   }
 }

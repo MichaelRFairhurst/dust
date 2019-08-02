@@ -2,7 +2,7 @@
 // for details. All rights reserved. Use of this source code is governed by a
 // BSD-style license that can be found in the LICENSE file.
 import 'package:dust/src/driver.dart';
-import 'package:dust/src/location_scorer.dart';
+import 'package:dust/src/path_scorer.dart';
 import 'package:dust/src/stats.dart';
 
 /// Service to automatically collect stats from events in the system.
@@ -17,9 +17,9 @@ class StatsCollector {
   StatsCollector(this.programStats)
       : progressStats = ProgressStats(DateTime.now(), programStats);
 
-  /// Listen to a [Driver] and [LocationScorer] for events that fill out the
+  /// Listen to a [Driver] and [PathScorer] for events that fill out the
   /// [programStats].
-  void collectFrom(Driver driver, LocationScorer locationScorer) {
+  void collectFrom(Driver driver, PathScorer pathScorer) {
     driver.onSuccess.listen((_) => progressStats.numberOfExecutions++);
     driver.onDuplicateFail.listen((_) => progressStats.numberOfExecutions++);
     driver.onUniqueFail.listen((_) {
@@ -33,6 +33,6 @@ class StatsCollector {
         progressStats.numberOfSeeds++;
       }
     });
-    locationScorer.onNewLocation.listen((_) => progressStats.visitedPaths++);
+    pathScorer.onNewPath.listen((_) => progressStats.visitedPaths++);
   }
 }
