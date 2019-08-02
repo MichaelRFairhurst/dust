@@ -3,3 +3,5 @@
 pubspec.lock
 example/*.snapshot*
 example/analyzer/bin/*.snapshot*
+example/*out
+example/analyzer/*out
