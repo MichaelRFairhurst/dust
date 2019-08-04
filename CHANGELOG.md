@@ -1,3 +1,5 @@
+* 1.0.0-beta.5
+
 - Automatic simplification of seeds
 - Better simplification algorithm
 - Optimized profile collection. `crash_on_bad.dart` now runs 6x faster, though
