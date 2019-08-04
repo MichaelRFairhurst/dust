@@ -30,7 +30,7 @@ class PathCanonicalizer {
   /// Clean up a VM script URI into a lower memory, compressed or human readable
   /// one.
   String processScriptUri(String scriptUri) => _canonicalizeScriptName(
-      _compress ? _compressScriptUri(scriptUri) : _cleanScriptUri(scriptUri));
+      _compress ? _compressScriptUri(scriptUri) : scriptUri);
 
   /// Add this script URI to the canonical pool and/or return the canonical
   /// version.
@@ -45,12 +45,6 @@ class PathCanonicalizer {
     _scripts.add(scriptUri);
     return scriptUri;
   }
-
-  /// Clean up a VM script URI into a lower memory, human readable one.
-  String _cleanScriptUri(String scriptUri) => scriptUri
-      .split('/')[3]
-      .replaceAll('%2F', '/')
-      .replaceAll('file%3A//', '');
 
   /// Clean up a VM script URI into compressed lower memory hash.
   ///

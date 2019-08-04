@@ -18,9 +18,12 @@ class Simplifier {
   final VmController _controller;
   final List<Constraint> _constraints;
   var _checks = 0;
+  final _readCoverage;
 
   /// Construct a Driver to run fuzz testing.
-  Simplifier(this._originalInputResult, this._controller, this._constraints);
+  Simplifier(this._originalInputResult, this._controller, this._constraints)
+      : _readCoverage =
+            _constraints.any((constraint) => constraint.constrainsCoverage);
 
   /// Simplify the original [InputResult] according to the constraints.
   Future<String> simplify() => _chunkDown(_originalInputResult.input);
@@ -75,7 +78,7 @@ class Simplifier {
 
   Future<bool> _try(String input) async {
     _checks++;
-    final result = await _controller.run(input);
+    final result = await _controller.run(input, readCoverage: _readCoverage);
     return _constraints.every((constraint) => constraint.accept(result));
   }
 }

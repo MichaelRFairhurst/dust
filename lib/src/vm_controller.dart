@@ -80,10 +80,10 @@ class VmController {
   }
 
   /// Run an individual case on a VM controller that's already been prestarted.
-  Future<VmResult> run(String input) async {
+  Future<VmResult> run(String input, {bool readCoverage = true}) async {
     final fuzzIsolate = await _preRunCase(input);
 
-    final paths = await _getPath(fuzzIsolate);
+    final paths = readCoverage ? await _getPath(fuzzIsolate) : null;
 
     final jsonOut = await _finalizeOutput(fuzzIsolate);
 
@@ -122,18 +122,14 @@ class VmController {
   }
 
   Future<int> _countPath(Isolate isolate) async {
-    final scripts = await _serviceClient.getScripts(isolate.id);
+    final report = await _serviceClient
+        .getSourceReport(isolate.id, [SourceReportKind.kCoverage]);
     var sum = 0;
-    for (final scriptRef in scripts.scripts) {
-      final coverage = await _serviceClient.getSourceReport(
-          isolate.id, [SourceReportKind.kCoverage],
-          scriptId: scriptRef.id);
-      for (final range in coverage.ranges) {
-        if (range.coverage == null) {
-          continue;
-        }
-        sum += range.coverage.hits.length + range.coverage.misses.length;
+    for (final range in report.ranges) {
+      if (range.coverage == null) {
+        continue;
       }
+      sum += range.coverage.hits.length + range.coverage.misses.length;
     }
     return sum;
   }
@@ -201,30 +197,20 @@ class VmController {
   }
 
   Future<List<Path>> _getPath(Isolate isolate) async {
-    final scripts = await _serviceClient.getScripts(isolate.id);
-    return Future.wait(
-      scripts.scripts.map(
-        (scriptRef) => _serviceClient.getSourceReport(
-            isolate.id, [SourceReportKind.kCoverage],
-            scriptId: scriptRef.id),
-      ),
-    ).then((sourceReports) => sourceReports
-        .expand(
-          (sourceReport) => sourceReport.ranges.expand(
-            (range) =>
-                range.coverage?.hits?.map(
-                  (id) => _pathCanonicalizer.canonicalize(
-                    Path(
-                      _pathCanonicalizer
-                          .processScriptUri(sourceReport.scripts[0]?.id ?? ""),
-                      id,
-                    ),
-                  ),
-                ) ??
-                <Path>[],
-          ),
-        )
-        .toList());
+    final report = await _serviceClient
+        .getSourceReport(isolate.id, [SourceReportKind.kCoverage]);
+    return report.ranges
+        .where((range) => range.coverage != null)
+        .expand((range) {
+      final uri = _pathCanonicalizer
+          .processScriptUri(report.scripts[range.scriptIndex].uri);
+      return range.coverage.hits.map((id) => _pathCanonicalizer.canonicalize(
+            Path(
+              uri,
+              id,
+            ),
+          ));
+    }).toList();
   }
 
   /// Execute the [input] on the vm, but then pause to collect instrumentation.

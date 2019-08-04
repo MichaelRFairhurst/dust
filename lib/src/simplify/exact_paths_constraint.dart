@@ -19,6 +19,9 @@ class ExactPathsConstraint implements Constraint {
       : _expectedCoverage = Set.from(result.paths);
 
   @override
+  bool get constrainsCoverage => true;
+
+  @override
   bool accept(VmResult result) =>
       Set.from(result.paths).intersection(_expectedCoverage).length ==
       result.paths.length;

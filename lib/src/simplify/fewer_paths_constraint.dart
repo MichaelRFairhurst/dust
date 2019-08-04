@@ -2,8 +2,8 @@
 // for details. All rights reserved. Use of this source code is governed by a
 // BSD-style license that can be found in the LICENSE file.
 
-import 'package:dust/src/vm_result.dart';
 import 'package:dust/src/simplify/constraint.dart';
+import 'package:dust/src/vm_result.dart';
 
 /// Constraint that the coverage must be fewer in count than prior coverage.
 class FewerPathsConstraint implements Constraint {
@@ -15,6 +15,9 @@ class FewerPathsConstraint implements Constraint {
   /// Constraint that the coverage must cover fewer paths than the given result.
   FewerPathsConstraint.thanResult(VmResult result)
       : _maxPaths = result.paths.length;
+
+  @override
+  bool get constrainsCoverage => true;
 
   @override
   bool accept(VmResult result) => result.paths.length <= _maxPaths;

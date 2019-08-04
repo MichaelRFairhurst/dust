@@ -6,6 +6,12 @@ import 'package:dust/src/vm_result.dart';
 
 /// A class to constrain what is acceptable as a simplification of a result.
 abstract class Constraint {
+  /// Whether the constraint requires collecting coverage to verify.
+  ///
+  /// Must not change over time, must either always be true or false for any
+  /// given [Constraint].
+  bool get constrainsCoverage;
+
   /// Whether the constraint is satisfied for the [result].
   bool accept(VmResult result);
 }

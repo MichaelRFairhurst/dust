@@ -19,6 +19,9 @@ class SubsetPathsConstraint implements Constraint {
       : _superset = Set.from(result.paths);
 
   @override
+  bool get constrainsCoverage => true;
+
+  @override
   bool accept(VmResult result) =>
       Set.from(result.paths).difference(_superset).isNotEmpty;
 }

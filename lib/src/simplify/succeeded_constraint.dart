@@ -19,5 +19,8 @@ class SucceededConstraint implements Constraint {
   SucceededConstraint.succeeded() : _expectation = true;
 
   @override
+  bool get constrainsCoverage => false;
+
+  @override
   bool accept(VmResult result) => result.succeeded == _expectation;
 }

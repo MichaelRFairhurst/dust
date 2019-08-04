@@ -62,14 +62,14 @@ class Driver {
   Future<void> run(List<SeedCandidate> inputs) async {
     // run initial seed candidates
     await Pool<VmController, SeedCandidate>(_runners, _preseed,
-            handleError: (controller, seed, error) =>
-                throw Exception('failed to preseed $seed: $error'))
+            handleError: (controller, seed, error, [st]) =>
+                throw Exception('failed to preseed $seed: $error $st'))
         .consume(Queue.from(inputs));
 
     final pool = Pool<VmController, Seed>(_runners, _runCase,
-        handleError: (controller, seed, error) async {
+        handleError: (controller, seed, error, [st]) async {
       // TODO(mfairhurst): report this some other way.
-      print('error with ${seed.input}: $error');
+      print('error with ${seed.input}: $error $st');
       if (controller.isConnected) {
         await controller.dispose();
       }

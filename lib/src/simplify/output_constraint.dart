@@ -2,8 +2,8 @@
 // for details. All rights reserved. Use of this source code is governed by a
 // BSD-style license that can be found in the LICENSE file.
 
-import 'package:dust/src/vm_result.dart';
 import 'package:dust/src/simplify/constraint.dart';
+import 'package:dust/src/vm_result.dart';
 
 /// Constrains the simplifier to only failed, or only passing, results.
 class OutputConstraint implements Constraint {
@@ -14,6 +14,9 @@ class OutputConstraint implements Constraint {
 
   /// Constrain the simplifier to have the same output as this [VmResult].
   OutputConstraint.sameAs(VmResult result) : _output = result.errorOutput;
+
+  @override
+  bool get constrainsCoverage => false;
 
   @override
   bool accept(VmResult result) => result.errorOutput == _output;

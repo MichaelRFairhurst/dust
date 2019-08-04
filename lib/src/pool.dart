@@ -13,12 +13,12 @@ class Pool<W, D> {
 
   /// Error handler which accepts the worker that failed, the item it failed on,
   /// and the error that was raised.
-  final Future<bool> Function(W, D, Object) _handleError;
+  final Future<bool> Function(W, D, Object, [StackTrace]) _handleError;
 
   /// Create a [Pool] of workers, along with how they run and an optional error
   /// handler.
   Pool(this._workers, this._use,
-      {Future<bool> Function(W, D, Object) handleError})
+      {Future<bool> Function(W, D, Object, [StackTrace]) handleError})
       : _handleError = handleError;
 
   /// Give the pool a [Queue] to work through before the resulting future
@@ -32,8 +32,8 @@ class Pool<W, D> {
       final item = queue.removeLast();
       try {
         await _use(worker, item);
-      } catch (e) {
-        if (await _handleError(worker, item, e)) {
+      } catch (e, st) {
+        if (await _handleError(worker, item, e, st)) {
           queue.add(item);
         }
       }
