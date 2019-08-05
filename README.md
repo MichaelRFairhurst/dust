@@ -190,5 +190,6 @@ The fuzzer works like so:
 - [ ] use locality sensitive hashing to dedupe failures with different messages
       (or in the case of timeouts, the same messages) by jaccard index of their
       code coverage sets. Perhaps from: https://arxiv.org/pdf/1811.04633
+- [ ] customizable limits & timeouts for simplifier?
 
 etc.

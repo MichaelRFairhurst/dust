@@ -95,7 +95,7 @@ class Cli {
           ..addFlag('constraint_subset_paths')
           ..addFlag('constraint_fewer_paths')
           ..addFlag('constraint_exact_paths')
-          ..addFlag('constraint_same_output', defaultsTo: true)
+          ..addFlag('constraint_same_output')
           ..addFlag('constraint_failed', defaultsTo: true));
 
   /// Run the CLI given the provided arguments.
@@ -257,31 +257,40 @@ class Cli {
     final vmController = VmController(script, port, timeout, pathCanonicalizer);
     try {
       await vmController.prestart();
-      final result = await vmController.run(seed);
-      if (result.succeeded && args['constraint_failed']) {
+      final originalResult = await vmController.run(seed);
+      if (originalResult.succeeded && args['constraint_failed']) {
         print('Error: seed $seed did not fail, cannot be simplified.');
         return;
       }
-      final originalInputResult =
-          InputResult(seed, await vmController.run(seed));
+      final startTime = DateTime.now();
+      final originalInputResult = InputResult(seed, originalResult);
       final simplifier = Simplifier(originalInputResult, vmController, [
         if (args['constraint_failed']) SucceededConstraint.failed(),
         if (args['constraint_subset_paths'])
-          SubsetPathsConstraint.ofResult(originalInputResult.result),
+          SubsetPathsConstraint.ofResult(originalResult),
         if (args['constraint_fewer_paths'])
-          FewerPathsConstraint.thanResult(originalInputResult.result),
+          FewerPathsConstraint.thanResult(originalResult),
         if (args['constraint_exact_paths'])
-          ExactPathsConstraint.sameAs(originalInputResult.result),
+          ExactPathsConstraint.sameAs(originalResult),
         if (args['constraint_same_output'])
-          OutputConstraint.sameAs(originalInputResult.result),
+          OutputConstraint.sameAs(originalResult),
       ]);
 
-      final simplification = await simplifier.simplify();
+      final simplification = await simplifier.simplifyToFixedPoint();
 
-      if (seed == simplification) {
+      final seconds =
+          DateTime.now().difference(startTime).inMilliseconds / 1000;
+      if (seed == simplification.input) {
+        print('Simplification attempt took $seconds seconds.');
         print('Could not simplify.');
       } else {
-        print('Simplified.\n$simplification');
+        print('Simplified in $seconds seconds.');
+        if (simplification.result.errorOutput != originalResult.errorOutput) {
+          print(r'''
+  Warning: error output was changed during simplification.
+  Rerun with --constraint_same_output to prevent this.''');
+        }
+        print('${simplification.input}');
       }
     } finally {
       await vmController.dispose();

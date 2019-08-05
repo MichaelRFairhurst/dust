@@ -89,15 +89,12 @@ class Driver {
 
   Future<Seed> _potentialSeed(InputResult original, VmController runner) async {
     final result = original.result;
-    final input = original.input;
     final uniquePaths = _seeds.uniquePaths(result);
     if (uniquePaths.isNotEmpty) {
       final simplifier = Simplifier(
           original, runner, [SupersetPathsConstraint(uniquePaths.toSet())]);
       final simplified = await simplifier.simplify();
-      // TODO: don't rerun here.
-      final newResult = await runner.run(input);
-      return _seeds.report(simplified, newResult);
+      return _seeds.report(simplified.input, simplified.result);
     }
     return null;
   }

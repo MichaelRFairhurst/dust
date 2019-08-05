@@ -1,3 +1,9 @@
+- Time printouts during simplification
+- Warning if simplifier changed output / "same output" constraint no longer
+  defaults to ON.
+- Run the simplifier to a fixed point when called from CLI.
+- Optimized optimizer for long input sequences.
+
 * 1.0.0-beta.5
 
 - Automatic simplification of seeds
