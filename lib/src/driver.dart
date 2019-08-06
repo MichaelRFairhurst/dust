@@ -64,7 +64,7 @@ class Driver {
     await Pool<VmController, SeedCandidate>(_runners, _preseed,
             handleError: (controller, seed, error, [st]) =>
                 throw Exception('failed to preseed $seed: $error $st'))
-        .consume(Queue.from(inputs));
+        .consume(Queue.from(inputs.reversed));
 
     final pool = Pool<VmController, Seed>(_runners, _runCase,
         handleError: (controller, seed, error, [st]) async {

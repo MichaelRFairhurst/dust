@@ -1,3 +1,8 @@
+* 1.0.0-beta.7
+
+- Run manual seeds first, corpus seeds second, seed dir third, for better
+  performance when the seed dir requires minimization.
+
 * 1.0.0-beta.6
 
 - Specifiable fuzz count limit, and exits 1 if any failures detected.
