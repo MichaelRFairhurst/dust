@@ -1,3 +1,4 @@
+- Specifiable fuzz count limit, and exits 1 if any failures detected.
 - Time printouts during simplification
 - Warning if simplifier changed output / "same output" constraint no longer
   defaults to ON.

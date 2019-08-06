@@ -42,6 +42,8 @@ directory named `script.dart.corpus` that contains interesting fuzz samples used
 to explore your program (this is how coverage-guided fuzzing works). This means
 you can stop fuzzing your program and restart without losing progress.
 
+#### Manual seeding
+
 You can specify manual seeds in one of two ways. You can either pass in seeds
 on the command-line, ie, `--seed foo --seed bar`, or you can pass in a seed
 directory (which may function much like a unit test directory) with
@@ -55,8 +57,16 @@ coverage tool finds them interesting. Once interesting cases have been added to
 the corpus, you don't need to pass in those seeds again until your program
 perhaps changes in a meaningful way.
 
-A corpus can be reduced using this concept, by simply providing the flags
-`--seed_dir=old.corpus --corpus_dir=new.corpus`.
+#### Minifying
+
+A corpus can be reduced using manual seeding, by simply providing the flags
+`--seed_dir=old.corpus --corpus_dir=new.corpus`. Optionally you may provide
+`--count 0` to stop when the minimization is done.
+
+#### Merging two corpuses
+
+You can also merge two corpuses by simply manually seeding one corpus into
+another, ie, `--seed_dir=corpus1 --corpus-dir=corpus2`.
 
 ### Simplifying Cases
 
@@ -91,7 +101,7 @@ main(args, SendPort sendPort) => customMutatorHelper(sendPort, (str) {
 });
 ```
 
-To use this script, provide the flag '--mutator_script=script.dart`.
+To use this script, provide the flag `--mutator_script=script.dart`.
 
 By default, each mutator (including the three default ones) have equal
 probability. However, you may set a weight on custom scripts by appending a `:`
@@ -179,13 +189,10 @@ The fuzzer works like so:
 - [ ] [try different fuzz mutation techniques](https://lcamtuf.blogspot.com/2014/08/binary-fuzzing-strategies-what-works.html)
 - [ ] auto-snapshot scripts for users
 - [ ] improve coverage %
-- [ ] cull seeds that are no longer unique
-- [ ] some renames: Location should probably be Path, and Library should probably
-      be Corpus
+- [ ] some renames in the code: Library/Corpus
 - [ ] targeted scoring for paths through certain files/packages/etc
 - [ ] better (different?) simplification algorithm(s?)
 - [ ] automatic detection of simpler seeds during fuzzing?
-- [ ] automatically simplify new seeds
 - [ ] store fuzzing options in script file (such as custom mutators, timeouts)
 - [ ] use locality sensitive hashing to dedupe failures with different messages
       (or in the case of timeouts, the same messages) by jaccard index of their

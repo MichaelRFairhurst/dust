@@ -2,6 +2,7 @@
 // for details. All rights reserved. Use of this source code is governed by a
 // BSD-style license that can be found in the LICENSE file.
 
+import 'dart:async';
 import 'dart:io';
 import 'dart:math';
 
@@ -82,6 +83,10 @@ class Cli {
       help: 'A path to a script, or comma separated path to scripts, that'
           ' perform specialized mutations',
     )
+    ..addOption('count',
+        abbr: 'n',
+        help: 'How many fuzz cases to run. -1 is no limit',
+        defaultsTo: '-1')
     ..addCommand(
         'simplify',
         ArgParser()
@@ -128,6 +133,7 @@ class Cli {
     int port;
     int statsInterval;
     int timeout;
+    int count;
     double pathSensitivity;
     try {
       batchSize = int.parse(args['batch_size']);
@@ -136,6 +142,7 @@ class Cli {
       pathSensitivity = double.parse(args['path_sensitivity']);
       statsInterval = int.parse(args['stats_interval']);
       timeout = int.parse(args['timeout']);
+      count = int.parse(args['count']);
     } catch (e) {
       print('invalid specified argument: $e');
       _usageAndExit();
@@ -155,6 +162,7 @@ class Cli {
     }
 
     List<VmController> vmControllers;
+    _CliStats cliStats;
     try {
       final pathScorer = PathScorer(pathSensitivity);
       final pathCanonicalizer =
@@ -192,14 +200,17 @@ class Cli {
       driver.onUniqueFail.listen((failure) {
         print('\nFAILURE: ${failure.input}\n${failure.result.errorOutput}');
         failurePersistence?.recordFailure(failure);
+        exitCode = 1;
       });
       if (seeds.isEmpty) {
         seeds.add(SeedCandidate.initial());
       }
 
-      _CliStats()._run(statsCollector, statsInterval);
-      await driver.run(seeds);
+      cliStats = _CliStats(statsCollector, statsInterval)..run();
+      await driver.run(seeds, count: count);
+      cliStats.printStats();
     } finally {
+      cliStats?.dispose();
       vmControllers.forEach((vmController) => vmController.dispose());
     }
   }
@@ -308,8 +319,18 @@ class Cli {
 }
 
 class _CliStats {
-  void _printStats(StatsCollector statsCollector) {
-    final stats = statsCollector.progressStats;
+  StreamSubscription<void> _timer;
+  final StatsCollector _statsCollector;
+  final int _intervalSeconds;
+
+  _CliStats(this._statsCollector, this._intervalSeconds);
+
+  void dispose() {
+    _timer?.cancel();
+  }
+
+  void printStats() {
+    final stats = _statsCollector.progressStats;
     final duration = DateTime.now().difference(stats.startTime);
 
     String format(double v) => v.toStringAsFixed(2);
@@ -328,18 +349,13 @@ Visited Paths: ${stats.visitedPaths}
         );
   }
 
-  void _run(StatsCollector statsCollector, int intervalSeconds) {
-    if (intervalSeconds == 0) {
+  void run() {
+    if (_intervalSeconds == 0) {
       return;
     }
 
-    final interval = Duration(seconds: intervalSeconds);
+    final interval = Duration(seconds: _intervalSeconds);
 
-    unawaited(() async {
-      while (true) {
-        await Future.delayed(interval);
-        _printStats(statsCollector);
-      }
-    }());
+    _timer = Stream.periodic(interval).listen((_) => printStats());
   }
 }

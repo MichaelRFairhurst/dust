@@ -59,7 +59,7 @@ class Driver {
   Stream<InputResult> get onUniqueFail => _uniqueFailStreamCtrl.stream;
 
   /// Begin running the [Driver]
-  Future<void> run(List<SeedCandidate> inputs) async {
+  Future<void> run(List<SeedCandidate> inputs, {int count = -1}) async {
     // run initial seed candidates
     await Pool<VmController, SeedCandidate>(_runners, _preseed,
             handleError: (controller, seed, error, [st]) =>
@@ -80,8 +80,11 @@ class Driver {
       return false;
     });
 
-    while (true) {
-      final batch = _seeds.getBatch(_batchSize, _random);
+    var i = 0;
+    while (count == -1 || i < count) {
+      final nextBatchSize = i + _batchSize > count ? count - i : _batchSize;
+      final batch = _seeds.getBatch(nextBatchSize, _random);
+      i += _batchSize;
 
       await pool.consume(Queue.from(batch));
     }
