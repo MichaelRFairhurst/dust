@@ -1,3 +1,5 @@
+* 1.0.0-beta.6
+
 - Specifiable fuzz count limit, and exits 1 if any failures detected.
 - Time printouts during simplification
 - Warning if simplifier changed output / "same output" constraint no longer
