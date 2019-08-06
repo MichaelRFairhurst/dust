@@ -8,4 +8,5 @@ environment:
   sdk: '>=2.1.0 <3.0.0'
 dependencies:
   analyzer: any
+  linter: any
   dust: '^1.0.0-beta.1'
