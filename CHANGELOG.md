@@ -1,3 +1,7 @@
+* 1.0.0-beta.8
+
+- Fix critical bug that broke fuzzer when no limit was set.
+
 * 1.0.0-beta.7
 
 - Run manual seeds first, corpus seeds second, seed dir third, for better

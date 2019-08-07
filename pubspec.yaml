@@ -1,5 +1,5 @@
 name: dust
-version: 1.0.0-beta.7
+version: 1.0.0-beta.8
 description: Coverage-guided fuzz testing for Dart
 authors:
   - Mike Fairhurst <mfairhurst@google.com>

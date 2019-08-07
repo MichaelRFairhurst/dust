@@ -82,9 +82,14 @@ class Driver {
 
     var i = 0;
     while (count == -1 || i < count) {
-      final nextBatchSize = i + _batchSize > count ? count - i : _batchSize;
+      int nextBatchSize;
+      if (count != -1 && i + _batchSize > count) {
+        nextBatchSize = count - i;
+      } else {
+        nextBatchSize = _batchSize;
+      }
       final batch = _seeds.getBatch(nextBatchSize, _random);
-      i += _batchSize;
+      i += nextBatchSize;
 
       await pool.consume(Queue.from(batch));
     }
