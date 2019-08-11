@@ -10,3 +10,12 @@ dependencies:
   analyzer: any
   linter: any
   dust: '^1.0.0-beta.1'
+dependency_overrides:
+  dust:
+    path: ../../
+  analyzer:
+    path: ../../../sdk/pkg/analyzer
+  front_end:
+    path: ../../../sdk/pkg/front_end
+  kernel:
+    path: ../../../sdk/pkg/kernel
