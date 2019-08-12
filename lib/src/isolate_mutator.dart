@@ -71,6 +71,7 @@ class IsolateMutator implements WeightedMutator {
         Uri.file(path.join(path.current, _scriptPath)),
         [],
         _receivePort.sendPort,
+        automaticPackageResolution: true,
         onError: _onErrorPort.sendPort,
         onExit: _onExitPort.sendPort);
 
