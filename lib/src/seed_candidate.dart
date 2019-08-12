@@ -35,4 +35,7 @@ class SeedCandidate {
   /// Get a string to identify this seed to the user; either its filename or its
   /// input.
   String get userString => filename ?? input;
+
+  @override
+  String toString() => 'seed candidate $input';
 }

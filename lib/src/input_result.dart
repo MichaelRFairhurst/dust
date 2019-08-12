@@ -14,4 +14,7 @@ class InputResult {
 
   /// Construct an [InputResult] with an [input] string and the [VmResult].
   InputResult(this.input, this.result);
+
+  @override
+  String toString() => 'input: $input\nresult: $result';
 }

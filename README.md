@@ -198,5 +198,8 @@ The fuzzer works like so:
       (or in the case of timeouts, the same messages) by jaccard index of their
       code coverage sets. Perhaps from: https://arxiv.org/pdf/1811.04633
 - [ ] customizable limits & timeouts for simplifier?
+- [ ] can we benefit from kernel transformers? For instance, break apart string
+      checks?
+- [ ] service extensions?
 
 etc.

@@ -87,6 +87,10 @@ class Cli {
         abbr: 'n',
         help: 'How many fuzz cases to run. -1 is no limit',
         defaultsTo: '-1')
+    ..addFlag('simplify',
+        abbr: 'l',
+        help: 'Whether to simplify input & discovered seeds.',
+        defaultsTo: true)
     ..addCommand(
         'simplify',
         ArgParser()
@@ -163,6 +167,7 @@ class Cli {
 
     List<VmController> vmControllers;
     _CliStats cliStats;
+    List<IsolateMutator> isolateMutators;
     try {
       final pathScorer = PathScorer(pathSensitivity);
       final pathCanonicalizer =
@@ -178,9 +183,11 @@ class Cli {
 
       final statsCollector =
           StatsCollector(ProgramStats(await vmControllers[0].countPaths()));
-      final mutators = await _getMutators(args);
+      isolateMutators = await _getIsolateMutators(args);
+      final mutators = _getMutators(args, isolateMutators);
       final driver = Driver(seedLibrary, failureLibrary, batchSize,
-          vmControllers, mutators, Random());
+          vmControllers, mutators, Random(),
+          simplify: args['simplify']);
       statsCollector.collectFrom(driver, pathScorer);
 
       driver.onNewSeed.listen((seed) {
@@ -211,17 +218,18 @@ class Cli {
       cliStats.printStats();
     } finally {
       cliStats?.dispose();
-      vmControllers.forEach((vmController) => vmController.dispose());
+      vmControllers?.forEach((vmController) => vmController.dispose());
+      isolateMutators?.forEach((mutator) => mutator.dispose());
     }
   }
 
-  Future<WeightedOptions<WeightedMutator>> _getMutators(ArgResults args) async {
+  Future<List<IsolateMutator>> _getIsolateMutators(ArgResults args) async {
     final isolateMutators =
         (args['mutator_script'] as List<String>).map((origScript) {
       String script;
       double weight;
       if (origScript.contains(':')) {
-        final parts = script.split(':');
+        final parts = origScript.split(':');
 
         script = parts[0];
         weight = double.parse(parts[1]);
@@ -232,8 +240,12 @@ class Cli {
 
       return IsolateMutator(script, weight);
     }).toList();
-
     await Future.wait(isolateMutators.map((isolate) => isolate.start()));
+    return isolateMutators;
+  }
+
+  WeightedOptions<WeightedMutator> _getMutators(
+      ArgResults args, List<IsolateMutator> isolateMutators) {
     final mutators = [
       if (args['default_mutators']) ...defaultMutators,
       ...isolateMutators

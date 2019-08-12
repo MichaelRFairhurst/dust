@@ -20,4 +20,7 @@ class Seed {
 
   /// Create an unscored seed.
   Seed(this.input, this.initialResult);
+
+  @override
+  String toString() => 'seed $input';
 }

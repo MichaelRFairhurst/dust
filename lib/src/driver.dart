@@ -18,6 +18,7 @@ import 'package:dust/src/simplify/simplifier.dart';
 import 'package:dust/src/simplify/superset_paths_constraint.dart';
 import 'package:dust/src/vm_controller.dart';
 import 'package:dust/src/weighted_random_choice.dart';
+import 'package:meta/meta.dart';
 
 /// Drives the main fuzz testing loop.
 ///
@@ -30,6 +31,7 @@ class Driver {
   final List<VmController> _runners;
   final WeightedOptions<WeightedMutator> _mutators;
   final int _batchSize;
+  final bool _simplify;
 
   final _successStreamCtrl = StreamController<void>.broadcast();
   final _newSeedStreamCtrl = StreamController<Seed>.broadcast();
@@ -40,7 +42,9 @@ class Driver {
 
   /// Construct a Driver to run fuzz testing.
   Driver(this._seeds, this._failures, this._batchSize, this._runners,
-      this._mutators, this._random);
+      this._mutators, this._random,
+      {@required bool simplify})
+      : _simplify = simplify;
 
   /// Notifications for all non-unique fuzz [InputResult] cases.
   Stream<InputResult> get onDuplicateFail => _duplicateFailStreamCtrl.stream;
@@ -62,23 +66,11 @@ class Driver {
   Future<void> run(List<SeedCandidate> inputs, {int count = -1}) async {
     // run initial seed candidates
     await Pool<VmController, SeedCandidate>(_runners, _preseed,
-            handleError: (controller, seed, error, [st]) =>
-                throw Exception('failed to preseed $seed: $error $st'))
+            handleError: _handleError)
         .consume(Queue.from(inputs.reversed));
 
-    final pool = Pool<VmController, Seed>(_runners, _runCase,
-        handleError: (controller, seed, error, [st]) async {
-      // TODO(mfairhurst): report this some other way.
-      print('error with ${seed.input}: $error $st');
-      if (controller.isConnected) {
-        await controller.dispose();
-      }
-      await controller.prestart();
-      // Don't re-add item. It is randomly generated, and we've printed it. So
-      // it is safer to drop. Otherwise, if we weren't careful, a single bad
-      // item could deadlock the queue.
-      return false;
-    });
+    final pool =
+        Pool<VmController, Seed>(_runners, _runCase, handleError: _handleError);
 
     var i = 0;
     while (count == -1 || i < count) {
@@ -95,7 +87,24 @@ class Driver {
     }
   }
 
+  Future<bool> _handleError<T>(VmController controller, T job, T error,
+      [StackTrace stackTrace]) async {
+    // TODO(mfairhurst): report this some other way.
+    print('error with $error: $error $stackTrace');
+    if (controller.isConnected) {
+      await controller.dispose();
+    }
+    await controller.prestart();
+    // Don't re-add item. It is randomly generated, and we've printed it. So
+    // it is safer to drop. Otherwise, if we weren't careful, a single bad
+    // item could deadlock the queue.
+    return false;
+  }
+
   Future<Seed> _potentialSeed(InputResult original, VmController runner) async {
+    if (!_simplify) {
+      return _seeds.report(original.input, original.result);
+    }
     final result = original.result;
     final uniquePaths = _seeds.uniquePaths(result);
     if (uniquePaths.isNotEmpty) {

@@ -36,6 +36,7 @@ class VmController {
   Process _process;
   DateTime _startTime;
   StringBuffer _outputBuffer;
+  StringBuffer _stdErrBuffer;
   Future<void> _processExit;
   Duration _timeElapsed;
 
@@ -144,8 +145,9 @@ class VmController {
 
     while (DateTime.now().difference(start) < limit) {
       if (_exitCode != null) {
-        throw Exception(
-            'VM at $_port exited with code $_exitCode:\n$_outputBuffer');
+        throw Exception('VM at $_port exited with code $_exitCode:\n'
+            '$_outputBuffer\n'
+            '$_stdErrBuffer');
       }
 
       try {
@@ -243,10 +245,12 @@ class VmController {
     }));
     _processExit = vmCompleter.future;
 
-    // ignore: strong_mode_down_cast_composite
     _process.stdout
         .transform(utf8.decoder)
         .listen((output) => _outputBuffer?.write(output));
+
+    _stdErrBuffer = StringBuffer();
+    _process.stderr.transform(utf8.decoder).listen(_stdErrBuffer.write);
   }
 }
 

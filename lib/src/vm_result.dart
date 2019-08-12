@@ -23,4 +23,8 @@ class VmResult {
 
   /// Whether the VM run succeeded.
   bool get succeeded => errorOutput == null;
+
+  @override
+  String toString() => '${succeeded ? 'succeeded' : 'failed: $errorOutput'}'
+      '\nin ${timeElapsed.inMilliseconds}ms';
 }
