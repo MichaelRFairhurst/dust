@@ -55,7 +55,7 @@ class Simplifier {
     //_allowedChecks = 0;
     var currentResult = originalResult;
     var currentString = originalResult.input;
-    var chunkSize = currentString.length >> 2;
+    var chunkSize = currentString.length; // will get cut down by half
     while (_allowedChecks > 0) {
       if (currentString.isEmpty) {
         return currentResult;
@@ -74,11 +74,11 @@ class Simplifier {
         break;
       }
       final newResult = await _removeChunks(currentResult, chunkSize);
-      if (currentResult == newResult && chunkSize == 1) {
+      if (chunkSize == 1) {
         break;
       }
 
-      final endingLength = currentString.length;
+      final endingLength = newResult.input.length;
       final removedLength = startingLength - endingLength;
       final removedChunks = removedLength / chunkSize;
       final removalAttempts = startingLength / chunkSize;
@@ -95,6 +95,10 @@ class Simplifier {
   }
 
   Future<InputResult> _removeChunks(InputResult original, int length) async {
+    if (length == 1) {
+      return _sweepChars(original);
+    }
+
     var currentResult = original;
     var currentString = original.input;
     for (var i = currentString.length - length;
@@ -108,6 +112,44 @@ class Simplifier {
         currentResult = InputResult(currentString, newResult);
       }
     }
+    return currentResult;
+  }
+
+  Future<InputResult> _sweepChars(InputResult original) async {
+    var currentResult = original;
+    var currentString = original.input;
+    var reversing = false;
+    int restartIndex;
+
+    bool needsReverse(int i) => i < 0 || i == currentString.length;
+    bool done(int i) => needsReverse(i) && restartIndex == null;
+    int next(int i) {
+      final inc = reversing ? i - 1 : i + 1;
+      if (needsReverse(inc) && restartIndex != null) {
+        reversing = !reversing;
+        final result = restartIndex;
+        restartIndex = null;
+        return result;
+      }
+
+      return inc;
+    }
+
+    int previous(i) => reversing ? i : i - 1;
+
+    for (var i = 0; _allowedChecks > 0 && !done(i); i = next(i)) {
+      final tryString = currentString.replaceRange(i, i + 1, '');
+      final newResult = await _try(tryString);
+      if (newResult != null) {
+        restartIndex = previous(i);
+        currentString = tryString;
+        currentResult = InputResult(currentString, newResult);
+        if (!reversing) {
+          i--; // account for removed char.
+        }
+      }
+    }
+
     return currentResult;
   }
 
