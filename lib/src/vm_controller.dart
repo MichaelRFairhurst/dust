@@ -228,6 +228,7 @@ class VmController {
 
     _process = await Process.start('$sdk/bin/dart', [
       '--pause_isolates_on_exit',
+      '--enable-asserts',
       '--enable-vm-service=$_port',
       '--disable-service-auth-codes',
       path.join(Platform.environment['HOME'],

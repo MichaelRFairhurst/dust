@@ -184,7 +184,7 @@ class Cli {
       final statsCollector =
           StatsCollector(ProgramStats(await vmControllers[0].countPaths()));
       isolateMutators = await _getIsolateMutators(args);
-      final mutators = _getMutators(args, isolateMutators);
+      final mutators = _getMutators(args, isolateMutators, seedLibrary);
       final driver = Driver(seedLibrary, failureLibrary, batchSize,
           vmControllers, mutators, Random(),
           simplify: args['simplify']);
@@ -244,10 +244,12 @@ class Cli {
     return isolateMutators;
   }
 
-  WeightedOptions<WeightedMutator> _getMutators(
-      ArgResults args, List<IsolateMutator> isolateMutators) {
+  WeightedOptions<WeightedMutator> _getMutators(ArgResults args,
+      List<IsolateMutator> isolateMutators, SeedLibrary seedLibrary) {
     final mutators = [
       if (args['default_mutators']) ...defaultMutators,
+      if (args['default_mutators']) getCrossoverMutator(seedLibrary),
+      if (args['default_mutators']) getSpliceMutator(seedLibrary),
       ...isolateMutators
     ];
     if (mutators.isEmpty) {

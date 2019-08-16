@@ -1,3 +1,5 @@
+- enable asserts in fuzz target VMs
+- Added mutators to merge two existing seeds
 - Stack 1-3 changes rather than only doing 1 mutation.
 - Simplifier improvements: bugfix, faster fixed-point search.
 

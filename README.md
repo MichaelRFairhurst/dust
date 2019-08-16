@@ -186,7 +186,6 @@ The fuzzer works like so:
 - [ ] investigate adding support for coverage in AOT apps, which will speed up
       running fuzz cases
 - [ ] improve error handling for cases where the dart VM crashes etc
-- [ ] [try different fuzz mutation techniques](https://lcamtuf.blogspot.com/2014/08/binary-fuzzing-strategies-what-works.html)
 - [ ] auto-snapshot scripts for users
 - [ ] improve coverage %
 - [ ] some renames in the code: Library/Corpus
@@ -201,5 +200,6 @@ The fuzzer works like so:
 - [ ] can we benefit from kernel transformers? For instance, break apart string
       checks?
 - [ ] service extensions?
+- [ ] special value recording? (perhaps via service extensions)?
 
 etc.
