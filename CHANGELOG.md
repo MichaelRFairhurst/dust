@@ -1,3 +1,4 @@
+- Stack 1-3 changes rather than only doing 1 mutation.
 - Simplifier improvements: bugfix, faster fixed-point search.
 
 * 1.0.0-beta.8
