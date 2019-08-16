@@ -11,20 +11,37 @@ import 'package:dust/src/weighted_random_choice.dart';
 ///
 /// For better performance, use [mutateMany] when possible, because
 /// WeightedOptions.chooseMany is more performant than WeightedOptions.choose().
-FutureOr<String> mutate(String input, Random random,
-        WeightedOptions<WeightedMutator> mutators) =>
-    mutators.choose(random).mutatorFn(input, random);
+FutureOr<String> mutate(
+    String input, Random random, WeightedOptions<WeightedMutator> mutators,
+    {int stacks = 3}) async {
+  var result = input;
+  for (var i = random.nextInt(stacks) + 1; i > 0; --i) {
+    result = await mutators.choose(random).mutatorFn(result, random);
+  }
+  return result;
+}
 
 /// Perform a random mutation on each of the input Strings.
 ///
 /// More performant than calling [mutate] n times, because
 /// WeightedOptions.chooseMany is more performant than WeightedOptions.choose().
 Future<List<String>> mutateMany(List<String> inputs, Random random,
-    WeightedOptions<WeightedMutator> mutators) async {
-  final which = mutators.chooseMany(inputs.length, random);
+    WeightedOptions<WeightedMutator> mutators,
+    {int stacks = 3}) async {
+  final chosenStacks =
+      Iterable.generate(inputs.length, (_) => random.nextInt(stacks) + 1)
+          .toList();
+  final totalMutators = chosenStacks.reduce((a, b) => a + b);
+  final chosenMutators = mutators.chooseMany(totalMutators, random);
   final results = List(inputs.length);
   for (var i = 0; i < inputs.length; ++i) {
-    results[i] = await which[i].mutatorFn(inputs[i], random);
+    results[i] = inputs[i];
+    for (var stackIndex = 0, mutatorIndex = 0;
+        stackIndex < chosenStacks[i];
+        stackIndex++, mutatorIndex++) {
+      results[i] =
+          await chosenMutators[mutatorIndex].mutatorFn(results[i], random);
+    }
   }
   return results;
 }
