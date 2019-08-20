@@ -145,9 +145,9 @@ class Driver {
       } else {
         _duplicateFailStreamCtrl.add(inputResult);
       }
+    } else {
+      _successStreamCtrl.add(null);
     }
-
-    _successStreamCtrl.add(null);
 
     final newSeed = await _potentialSeed(inputResult, runner);
     // Edge case: new seed may no longer be new.

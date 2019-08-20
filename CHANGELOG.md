@@ -2,6 +2,7 @@
 - Added mutators to merge two existing seeds
 - Stack 1-3 changes rather than only doing 1 mutation.
 - Simplifier improvements: bugfixes, faster fixed-point search.
+- Fixed issue treating failures as executions (printing . & double counting)
 
 * 1.0.0-beta.8
 
