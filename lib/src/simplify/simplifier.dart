@@ -73,12 +73,13 @@ class Simplifier {
         // broken out of the fixed point through chunk removal.
         break;
       }
-      final newResult = await _removeChunks(currentResult, chunkSize);
+      currentResult = await _removeChunks(currentResult, chunkSize);
+      currentString = currentResult.input;
       if (chunkSize == 1) {
         break;
       }
 
-      final endingLength = newResult.input.length;
+      final endingLength = currentString.length;
       final removedLength = startingLength - endingLength;
       final removedChunks = removedLength / chunkSize;
       final removalAttempts = startingLength / chunkSize;
@@ -87,8 +88,6 @@ class Simplifier {
       chunkSize = optimisticSuccessRate > 1
           ? chunkSize >> 2
           : (chunkSize * optimisticSuccessRate).floor();
-      currentResult = newResult;
-      currentString = currentResult.input;
     }
 
     return currentResult;
