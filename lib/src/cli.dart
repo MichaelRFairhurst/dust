@@ -19,6 +19,7 @@ import 'package:dust/src/path_scorer.dart';
 import 'package:dust/src/seed_candidate.dart';
 import 'package:dust/src/seed_library.dart';
 import 'package:dust/src/seed_persistence.dart';
+import 'package:dust/src/simplify/contains_constraint.dart';
 import 'package:dust/src/simplify/exact_paths_constraint.dart';
 import 'package:dust/src/simplify/fewer_paths_constraint.dart';
 import 'package:dust/src/simplify/output_constraint.dart';
@@ -105,7 +106,8 @@ class Cli {
           ..addFlag('constraint_fewer_paths')
           ..addFlag('constraint_exact_paths')
           ..addFlag('constraint_same_output')
-          ..addFlag('constraint_failed', defaultsTo: true));
+          ..addFlag('constraint_failed', defaultsTo: true)
+          ..addMultiOption('constraint_output_contains'));
 
   /// Run the CLI given the provided arguments.
   Future<void> run(List<String> baseArgs) async {
@@ -299,6 +301,15 @@ class Cli {
           ExactPathsConstraint.sameAs(originalResult),
         if (args['constraint_same_output'])
           OutputConstraint.sameAs(originalResult),
+        if (args['constraint_output_contains'] != null)
+          for (final output in args['constraint_output_contains'])
+            () {
+              final constraint = ContainsConstraint(output);
+              if (!constraint.accept(originalResult)) {
+                throw 'Aborting: original output did not contain "$output."';
+              }
+              return constraint;
+            }(),
       ]);
 
       final simplification = await simplifier.simplifyToFixedPoint();
