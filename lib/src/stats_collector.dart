@@ -7,32 +7,27 @@ import 'package:dust/src/stats.dart';
 
 /// Service to automatically collect stats from events in the system.
 class StatsCollector {
-  /// Stats about the program that do not change.
-  final ProgramStats programStats;
-
   /// Stats about the program progress.
-  final ProgressStats progressStats;
+  final Stats stats;
 
   /// Create a collector to gather information in additon to the [programStats].
-  StatsCollector(this.programStats)
-      : progressStats = ProgressStats(DateTime.now(), programStats);
+  StatsCollector(this.stats);
 
   /// Listen to a [Driver] and [PathScorer] for events that fill out the
   /// [programStats].
-  void collectFrom(Driver driver, PathScorer pathScorer) {
-    driver.onSuccess.listen((_) => progressStats.numberOfExecutions++);
-    driver.onDuplicateFail.listen((_) => progressStats.numberOfExecutions++);
+  void collectFrom(Driver driver) {
+    driver.onSuccess.listen((_) => stats.numberOfExecutions++);
+    driver.onDuplicateFail.listen((_) => stats.numberOfExecutions++);
     driver.onUniqueFail.listen((_) {
-      progressStats.numberOfExecutions++;
-      progressStats.numberOfFailures++;
+      stats.numberOfExecutions++;
+      stats.numberOfFailures++;
     });
-    driver.onNewSeed.listen((_) => progressStats.numberOfSeeds++);
+    driver.onNewSeed.listen((_) => stats.numberOfSeeds++);
     driver.onSeedCandidateProcessed.listen((candidate) {
-      progressStats.numberOfExecutions++;
+      stats.numberOfExecutions++;
       if (candidate.accepted) {
-        progressStats.numberOfSeeds++;
+        stats.numberOfSeeds++;
       }
     });
-    pathScorer.onNewPath.listen((_) => progressStats.visitedPaths++);
   }
 }

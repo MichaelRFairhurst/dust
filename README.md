@@ -186,8 +186,6 @@ The fuzzer works like so:
 - [ ] investigate adding support for coverage in AOT apps, which will speed up
       running fuzz cases
 - [ ] improve error handling for cases where the dart VM crashes etc
-- [ ] auto-snapshot scripts for users
-- [ ] improve coverage %
 - [ ] provide coverage report in standardized format
 - [ ] some renames in the code: Library/Corpus
 - [ ] targeted scoring for paths through certain files/packages/etc

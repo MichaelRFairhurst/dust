@@ -5,6 +5,7 @@
 import 'dart:async';
 import 'dart:math';
 
+import 'package:dust/src/coverage_tracker.dart';
 import 'package:dust/src/path.dart';
 
 /// Determines the uniqueness of a [Path] against all previously seen
@@ -28,32 +29,22 @@ import 'package:dust/src/path.dart';
 ///
 /// TODO: score unique files as well as unique paths?
 class PathScorer {
-  final _pathOccurences = <Path, int>{};
-
-  final _newPathCtrl = StreamController<void>.broadcast();
-
-  /// Get a stream of events for when new paths are discovered.
-  Stream<void> get onNewPath => _newPathCtrl.stream;
+  final CoverageTracker _coverageTracker;
 
   final double _sensitivity;
 
-  /// Create a new [PathScorer] with the given sensitivity.
-  PathScorer(this._sensitivity);
+  /// Create a new [PathScorer] with the given sensitivity and [PathTracker].
+  PathScorer(this._coverageTracker, this._sensitivity);
 
-  // TODO: add a bloom filter to make this faster?
   /// Check if a [Path] has been seen previously by this scorer.
-  bool isNew(Path path) => !_pathOccurences.containsKey(path);
+  bool isNew(Path path) => !_coverageTracker.hasOccurred(path);
 
   /// Report a [Path] for scoring later.
-  void report(Path path) => _pathOccurences
-    ..update(path, (value) => ++value, ifAbsent: () {
-      _newPathCtrl.add(null);
-      return 1;
-    });
+  void report(Path path) => _coverageTracker.reportPathOccurred(path);
 
   /// Score a [Path] (higher is more unique).
   double score(Path path) =>
-      pow(1.0 / (_pathOccurences[path] ?? 1), _sensitivity);
+      pow(1.0 / (_coverageTracker.occurrenceCount(path)), _sensitivity);
 
   /// Score a set of [Path]s (higher is more unique).
   double scoreAll(List<Path> paths) => paths.map(score).reduce((a, b) => a + b);

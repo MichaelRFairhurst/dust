@@ -7,6 +7,7 @@ import 'dart:io';
 import 'dart:math';
 
 import 'package:args/args.dart';
+import 'package:dust/src/coverage_tracker.dart';
 import 'package:dust/src/driver.dart';
 import 'package:dust/src/failure_library.dart';
 import 'package:dust/src/failure_persistence.dart';
@@ -178,29 +179,32 @@ class Cli {
       script = snapshot;
     }
 
+    final coverageTracker = CoverageTracker();
     List<VmController> vmControllers;
     _CliStats cliStats;
     List<IsolateMutator> isolateMutators;
     try {
-      final pathScorer = PathScorer(pathSensitivity);
+      final pathScorer = PathScorer(coverageTracker, pathSensitivity);
       final pathCanonicalizer =
           PathCanonicalizer(compress: args['compress_paths']);
       final seedLibrary = SeedLibrary(pathScorer);
       final failureLibrary = FailureLibrary();
-      vmControllers = Iterable.generate(vms,
-              (i) => VmController(script, port + i, timeout, pathCanonicalizer))
-          .toList();
+      vmControllers = Iterable.generate(
+          vms,
+          (i) => VmController(script, port + i, timeout, pathCanonicalizer,
+              coverageTracker)).toList();
 
       await Future.wait(
           vmControllers.map((vmController) => vmController.prestart()));
 
-      final statsCollector = StatsCollector(ProgramStats(0));
+      final statsCollector =
+          StatsCollector(Stats(DateTime.now(), coverageTracker));
       isolateMutators = await _getIsolateMutators(args);
       final mutators = _getMutators(args, isolateMutators, seedLibrary);
       final driver = Driver(seedLibrary, failureLibrary, batchSize,
           vmControllers, mutators, Random(),
           simplify: args['simplify']);
-      statsCollector.collectFrom(driver, pathScorer);
+      statsCollector.collectFrom(driver);
 
       driver.onNewSeed.listen((seed) {
         print('\nNew seed: ${seed.input}');
@@ -365,7 +369,7 @@ class _CliStats {
   }
 
   void printStats() {
-    final stats = _statsCollector.progressStats;
+    final stats = _statsCollector.stats;
     final duration = DateTime.now().difference(stats.startTime);
 
     String format(double v) => v.toStringAsFixed(2);
@@ -377,11 +381,9 @@ Time elapsed: ${duration}
 Total executions: ${stats.numberOfExecutions} (${format(stats.numberOfExecutions / duration.inSeconds)}/s)
 Total seeds: ${stats.numberOfSeeds} (${format(stats.seedRate * 100)}%)
 Total failures: ${stats.numberOfFailures} (${format(stats.failureRate * 100)}%)
-Visited Paths: ${stats.visitedPaths}
-'''
-// TODO(mfairhusrt): Gather correct program coverage to get an accurate ratio.
-// (${format(stats.coverageRatio * 100)}%)
-        );
+Visited Paths: ${stats.visitedPaths} (${format(stats.coverageRatio * 100)}%)
+Visited Files: ${stats.visitedFiles} (${format(stats.fileCoverageRatio * 100)}%)
+''');
   }
 
   void run() {

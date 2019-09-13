@@ -6,6 +6,7 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
+import 'package:dust/src/coverage_tracker.dart';
 import 'package:dust/src/path.dart';
 import 'package:dust/src/path_canonicalizer.dart';
 import 'package:dust/src/vm_result.dart';
@@ -38,10 +39,11 @@ class VmController {
   StringBuffer _stdErrBuffer;
   Future<void> _processExit;
   Duration _timeElapsed;
+  final CoverageTracker _coverageTracker;
 
   /// Construct a [VmController] from a script and a port.
-  VmController(
-      this._script, this._port, this._timeout, this._pathCanonicalizer);
+  VmController(this._script, this._port, this._timeout, this._pathCanonicalizer,
+      [this._coverageTracker]);
 
   /// Check if this VM is connected.
   bool get isConnected => _serviceClient != null;
@@ -72,7 +74,7 @@ class VmController {
   Future<VmResult> run(String input, {bool readCoverage = true}) async {
     final fuzzIsolate = await _preRunCase(input);
 
-    final paths = readCoverage ? await _getPath(fuzzIsolate) : null;
+    final paths = readCoverage ? await _getPaths(fuzzIsolate) : null;
     await _serviceClient.resume(fuzzIsolate.id);
     await _fuzzIsolateDead();
 
@@ -170,12 +172,11 @@ class VmController {
             !isolates.any((isolate) => isolate.name == 'fuzz_target'));
   }
 
-  Future<List<Path>> _getPath(Isolate isolate) async {
+  Future<List<Path>> _getPaths(Isolate isolate) async {
     final report = await _serviceClient
         .getSourceReport(isolate.id, [SourceReportKind.kCoverage]);
-    return report.ranges
-        .where((range) => range.coverage != null)
-        .expand((range) {
+    final hits =
+        report.ranges.where((range) => range.coverage != null).expand((range) {
       final uri = _pathCanonicalizer
           .processScriptUri(report.scripts[range.scriptIndex].uri);
       return range.coverage.hits.map((id) => _pathCanonicalizer.canonicalize(
@@ -185,6 +186,36 @@ class VmController {
             ),
           ));
     }).toList();
+
+    if (_coverageTracker != null) {
+      // Track coverage data. Note: do NOT track hits or we won't know later if
+      // any of the hits are new.
+      report.ranges.where((range) => range.coverage != null).expand((range) {
+        final uri = _pathCanonicalizer
+            .processScriptUri(report.scripts[range.scriptIndex].uri);
+        return range.coverage.misses
+            .map((id) => _pathCanonicalizer.canonicalize(
+                  Path(
+                    uri,
+                    id,
+                  ),
+                ));
+      }).forEach(_coverageTracker.reportPathMissed);
+
+      report.ranges
+          .where((range) => range.coverage != null)
+          .map((range) => _pathCanonicalizer
+              .processScriptUri(report.scripts[range.scriptIndex].uri))
+          .forEach(_coverageTracker.reportFileHasCoverage);
+
+      report.ranges
+          .where((range) => range.coverage == null)
+          .map((range) => _pathCanonicalizer
+              .processScriptUri(report.scripts[range.scriptIndex].uri))
+          .forEach(_coverageTracker.reportFileHasNoCoverage);
+    }
+
+    return hits;
   }
 
   /// Execute the [input] on the vm, but then pause to collect instrumentation.

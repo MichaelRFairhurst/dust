@@ -29,7 +29,7 @@ Future main(List<String> args) async {
 
       final onError = RawReceivePort();
       final onComplete = RawReceivePort();
-      var isolateDone = Completer();
+      final isolateDone = Completer();
 
       onError.handler = (error) {
         output.write(error);

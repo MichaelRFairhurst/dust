@@ -9,6 +9,7 @@
 - Better error when script is erroneous (though erroneous snapshots may not give
   a good error message)
 - switch from `vm_service_lib` to `vm_service`
+- Coverage stats by path as well as files that have not been executed.
 
 * 1.0.0-beta.8
 
