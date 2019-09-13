@@ -92,6 +92,11 @@ class Cli {
         abbr: 'l',
         help: 'Whether to simplify input & discovered seeds.',
         defaultsTo: true)
+    ..addFlag('snapshot',
+        abbr: 'a',
+        help: 'Whether to generate a snapshot before fuzzing. Defaults to true'
+            ' for scripts that end in .dart',
+        defaultsTo: null)
     ..addCommand(
         'simplify',
         ArgParser()
@@ -132,7 +137,7 @@ class Cli {
       _usageAndExit();
     }
 
-    final script = args.rest[0];
+    var script = args.rest[0];
 
     int batchSize;
     int vms;
@@ -167,6 +172,12 @@ class Cli {
       await failurePersistence.load();
     }
 
+    if (args['snapshot'] ?? script.endsWith('.dart')) {
+      final snapshot = '$script.snapshot';
+      await VmController.snapshot(script, snapshot);
+      script = snapshot;
+    }
+
     List<VmController> vmControllers;
     _CliStats cliStats;
     List<IsolateMutator> isolateMutators;
@@ -183,8 +194,7 @@ class Cli {
       await Future.wait(
           vmControllers.map((vmController) => vmController.prestart()));
 
-      final statsCollector =
-          StatsCollector(ProgramStats(await vmControllers[0].countPaths()));
+      final statsCollector = StatsCollector(ProgramStats(0));
       isolateMutators = await _getIsolateMutators(args);
       final mutators = _getMutators(args, isolateMutators, seedLibrary);
       final driver = Driver(seedLibrary, failureLibrary, batchSize,

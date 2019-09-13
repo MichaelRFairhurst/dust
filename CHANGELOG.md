@@ -4,6 +4,11 @@
 - Simplifier improvements: bugfixes, faster fixed-point search.
 - Fixed issue treating failures as executions (printing . & double counting)
 - New simplifier constraint "contains output"
+- Better error when port is already taken and observatory fails to start
+- Auto-snapshot scripts for users
+- Better error when script is erroneous (though erroneous snapshots may not give
+  a good error message)
+- switch from `vm_service_lib` to `vm_service`
 
 * 1.0.0-beta.8
 

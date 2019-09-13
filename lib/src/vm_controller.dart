@@ -5,15 +5,14 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
-import 'dart:math';
 
 import 'package:dust/src/path.dart';
 import 'package:dust/src/path_canonicalizer.dart';
 import 'package:dust/src/vm_result.dart';
 import 'package:path/path.dart' as path;
 import 'package:pedantic/pedantic.dart';
-import 'package:vm_service_lib/vm_service_lib.dart';
-import 'package:vm_service_lib/vm_service_lib_io.dart';
+import 'package:vm_service/vm_service.dart';
+import 'package:vm_service/vm_service_io.dart';
 
 /// A class to start a VM, connect to its service, and control its fuzz cases.
 ///
@@ -47,17 +46,6 @@ class VmController {
   /// Check if this VM is connected.
   bool get isConnected => _serviceClient != null;
 
-  /// Count all paths that could be exercised for the target script.
-  Future<int> countPaths() async {
-    final fuzzIsolate = await _preRunCase('');
-
-    final pathCount = await _countPath(fuzzIsolate);
-
-    await _finalizeOutput(fuzzIsolate);
-
-    return pathCount;
-  }
-
   /// Kill the process & close the service connection.
   Future<void> dispose() async {
     try {
@@ -85,8 +73,10 @@ class VmController {
     final fuzzIsolate = await _preRunCase(input);
 
     final paths = readCoverage ? await _getPath(fuzzIsolate) : null;
+    await _serviceClient.resume(fuzzIsolate.id);
+    await _fuzzIsolateDead();
 
-    final jsonOut = await _finalizeOutput(fuzzIsolate);
+    final jsonOut = await _finalizeOutput();
 
     final bool succeeded = jsonOut['success'];
     if (succeeded) {
@@ -122,19 +112,6 @@ class VmController {
     return _serviceClient;
   }
 
-  Future<int> _countPath(Isolate isolate) async {
-    final report = await _serviceClient
-        .getSourceReport(isolate.id, [SourceReportKind.kCoverage]);
-    var sum = 0;
-    for (final range in report.ranges) {
-      if (range.coverage == null) {
-        continue;
-      }
-      sum += range.coverage.hits.length + range.coverage.misses.length;
-    }
-    return sum;
-  }
-
   Future<T> _exponentialBackoff<T>(
       Future<T> Function() action, bool Function(T) accept,
       {Duration limit = const Duration(seconds: 5)}) async {
@@ -166,14 +143,9 @@ class VmController {
     throw Exception('$limit tries exceeded: $reason');
   }
 
-  /// Continue [fuzzIsolate] to unblock the main isolate and get json output.
-  Future<Map<String, dynamic>> _finalizeOutput(Isolate fuzzIsolate) async {
-    await _serviceClient.resume(fuzzIsolate.id);
-    await _fuzzIsolateDead();
-
-    return _exponentialBackoff(
-        () async => jsonDecode(_outputBuffer.toString().trim()), (_) => true);
-  }
+  /// Read the json output from the main isolate.
+  Future<Map<String, dynamic>> _finalizeOutput() async => _exponentialBackoff(
+      () async => jsonDecode(_outputBuffer.toString().trim()), (_) => true);
 
   Future<Isolate> _fuzzIsolateComplete() async {
     final isolateRef = await _exponentialBackoff(
@@ -184,7 +156,7 @@ class VmController {
 
     final isolate = await _exponentialBackoff(
         () async => _serviceClient.getIsolate(isolateRef.id),
-        (isolate) => isolate.pauseEvent.kind == 'PauseExit',
+        (isolate) => isolate == null || isolate.pauseEvent.kind == 'PauseExit',
         limit: Duration(seconds: _timeout + 2));
 
     _timeElapsed ??= DateTime.now().difference(_startTime);
@@ -234,7 +206,7 @@ class VmController {
       path.join(Platform.environment['HOME'],
           '.pub-cache/global_packages/dust/bin/controller.dart.snapshot.dart2'),
       _script,
-      "$_timeout",
+      '$_timeout',
     ]);
 
     final vmCompleter = Completer();
@@ -246,12 +218,39 @@ class VmController {
     }));
     _processExit = vmCompleter.future;
 
+    _outputBuffer = StringBuffer();
     _process.stdout
         .transform(utf8.decoder)
         .listen((output) => _outputBuffer?.write(output));
 
     _stdErrBuffer = StringBuffer();
     _process.stderr.transform(utf8.decoder).listen(_stdErrBuffer.write);
+
+    // Ensure observatory starts up properly.
+    // TODO: Try a different port on failure.
+    try {
+      await _exponentialBackoff(
+          () async => _outputBuffer.toString(),
+          (output) =>
+              output.contains('listening on') && output.contains(':$_port/'));
+    } catch (_) {
+      throw 'Observatory did not start on $_port\noutput:\n$_outputBuffer';
+    }
+  }
+
+  /// Generate a snapshot for the script, for faster fuzzing.
+  static Future<void> snapshot(String script, String snapshotPath) async {
+    final sdk = path.dirname(path.dirname(Platform.resolvedExecutable));
+
+    final result = await Process.run('$sdk/bin/dart', [
+      '--snapshot=$snapshotPath',
+      '--snapshot-kind=kernel',
+      script,
+    ]);
+
+    if (result.exitCode != 0) {
+      throw '${result.stdout}${result.stderr}';
+    }
   }
 }
 

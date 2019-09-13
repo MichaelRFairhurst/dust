@@ -188,18 +188,23 @@ The fuzzer works like so:
 - [ ] improve error handling for cases where the dart VM crashes etc
 - [ ] auto-snapshot scripts for users
 - [ ] improve coverage %
+- [ ] provide coverage report in standardized format
 - [ ] some renames in the code: Library/Corpus
 - [ ] targeted scoring for paths through certain files/packages/etc
-- [ ] better (different?) simplification algorithm(s?)
+- [ ] entropy based simplifier algorithm
 - [ ] automatic detection of simpler seeds during fuzzing?
 - [ ] store fuzzing options in script file (such as custom mutators, timeouts)
 - [ ] use locality sensitive hashing to dedupe failures with different messages
       (or in the case of timeouts, the same messages) by jaccard index of their
       code coverage sets. Perhaps from: https://arxiv.org/pdf/1811.04633
 - [ ] customizable limits & timeouts for simplifier?
-- [ ] can we benefit from kernel transformers? For instance, break apart string
-      checks?
-- [ ] service extensions?
-- [ ] special value recording? (perhaps via service extensions)?
+- [ ] special value recording via service extensions + kernel transformer?
+- [ ] break apart string comparisons with kernel transformer?
+- [ ] other service extensions?
+- [ ] other kernel transformer?
+- [ ] semantically-valid-dart transformer
+- [ ] generations of seeds?
+- [ ] way to exclude or score seeds when found?
+- [ ] change scoring of failed seeds?
 
 etc.
