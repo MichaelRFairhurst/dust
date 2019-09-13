@@ -113,7 +113,13 @@ class Cli {
           ..addFlag('constraint_exact_paths')
           ..addFlag('constraint_same_output')
           ..addFlag('constraint_failed', defaultsTo: true)
-          ..addMultiOption('constraint_output_contains'));
+          ..addMultiOption('constraint_output_contains')
+          ..addFlag('snapshot',
+              abbr: 'a',
+              help:
+                  'Whether to generate a snapshot before fuzzing. Defaults to true'
+                  ' for scripts that end in .dart',
+              defaultsTo: null));
 
   /// Run the CLI given the provided arguments.
   Future<void> run(List<String> baseArgs) async {
@@ -173,11 +179,7 @@ class Cli {
       await failurePersistence.load();
     }
 
-    if (args['snapshot'] ?? script.endsWith('.dart')) {
-      final snapshot = '$script.snapshot';
-      await VmController.snapshot(script, snapshot);
-      script = snapshot;
-    }
+    script = await _potentiallySnapshot(script, args);
 
     final coverageTracker = CoverageTracker();
     List<VmController> vmControllers;
@@ -275,13 +277,23 @@ class Cli {
     return WeightedOptions<WeightedMutator>(mutators, (m) => m.weight);
   }
 
+  Future<String> _potentiallySnapshot(String script, ArgResults args) async {
+    if (args['snapshot'] ?? script.endsWith('.dart')) {
+      final snapshot = '$script.snapshot';
+      await VmController.snapshot(script, snapshot);
+      return snapshot;
+    }
+
+    return script;
+  }
+
   Future<void> _simplify(ArgResults args) async {
     if (args.rest.length != 2) {
       print('expected a script to fuzz and an input to simplify');
       _usageAndExit();
     }
 
-    final script = args.rest[0];
+    var script = args.rest[0];
     final seed = args.rest[1];
 
     int port;
@@ -294,6 +306,7 @@ class Cli {
       _usageAndExit();
     }
 
+    script = await _potentiallySnapshot(script, args);
     final pathCanonicalizer = PathCanonicalizer(compress: false);
     final vmController = VmController(script, port, timeout, pathCanonicalizer);
     try {
